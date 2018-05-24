@@ -1,0 +1,57 @@
+{
+  "name": "VMstore-state-reporter",
+  "version": "1.0.0",
+  "description": "VMstore-state-reporter",
+  "main": "app/main.js",
+  "scripts": {
+    "start": "electron ."
+  },
+  "repository": "https://github.com/akkravikumar/VMstore",
+  "dependencies": {
+    "bootstrap": "^4.1.0",
+    "datatables.net": "^1.10.16",
+    "datatables.net-dt": "^1.10.16",
+    "dexie": "^2.0.2",
+    "electron-compile": "^6.4.2",
+    "electron-packager": "^12.1.0",
+    "electron-squirrel-startup": "^1.0.0",
+    "html2canvas": "^1.0.0-alpha.12",
+    "jquery": "*",
+    "pdfmake": "^0.1.36",
+    "request": "^2.85.0"
+  },
+  "author": "Ravi Kumar K",
+  "devDependencies": {
+    "babel-plugin-transform-async-to-generator": "^6.24.1",
+    "babel-preset-env": "^1.6.1",
+    "babel-preset-react": "^6.24.1",
+    "electron-forge": "^5.2.0",
+    "electron-prebuilt-compile": "1.8.4",
+    "electron-tooltip": "^1.1.4"
+  },
+  "config": {
+    "forge": {
+      "make_targets": {
+        "win32": [
+          "squirrel"
+        ]
+      },
+      "electronPackagerConfig": {
+        "packageManager": "npm"
+      },
+      "electronWinstallerConfig": {
+        "name": "VMstore_state_reporter"
+      },
+      "electronInstallerDebian": {},
+      "electronInstallerRedhat": {},
+      "github_repository": {
+        "owner": "Ravi Kumar K",
+        "name": "Ravi Kumar K"
+      },
+      "windowsStoreConfig": {
+        "packageName": "",
+        "name": "VMstore"
+      }
+    }
+  }
+}

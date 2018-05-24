@@ -1,0 +1,829 @@
+<!doctype html>
+<html lang="en">
+    <head>
+    <!-- Required meta tags -->
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+
+        <!-- Bootstrap CSS -->
+        <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.1.0/css/bootstrap.min.css" integrity="sha384-9gVQ4dYFwwWSjIDZnLEWnxCjeSWFphJiwGPXr1jddIhOegiu1FwO5qRGvFXOdJZ4" crossorigin="anonymous">
+        <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/1.10.16/css/jquery.dataTables.min.css">
+        <link href="https://stackpath.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css" rel="stylesheet" integrity="sha384-wvfXpqpZZVQGK6TAh5PVlGOfQNHSoD2xbE+QkPxCAFlNEevoEH3Sl0sibVcOQVnN" crossorigin="anonymous">
+        <link rel="stylesheet" href="./css/dataTables.checkboxes.css"/>
+        <title>VMstore State Reporter</title>
+
+        <style>
+            .grid-container {
+                display: grid;
+                grid-template-columns: auto auto auto auto;
+                background-color: #f7f7f7;
+                padding: 10px;
+                margin: 0 auto;
+              }
+
+              .grid-item {
+                background-color: #f7f7f7;
+                border: 1px solid rgba(0, 0, 0, 0.1);
+                font-size: 30px;
+                padding: 20px;
+              }
+
+              .grid-div {
+                width: 220px;
+              }
+
+              a,a:hover{
+                text-decoration: none
+              }
+
+              .title {
+                font-size: 70%;
+                font-weight: 300;
+                color: #999999;
+                line-height: 1.75;
+              }
+
+            .gridDiv{
+                margin:0 auto;
+            }
+        </style>
+    </head>
+    <body>
+    <div class="container">
+        <h1>VMstore State Reporter</h1>
+
+        <div class="alert" id="alertMsg" role="alert"></div>
+
+        <div class="card" id="serverFormDiv">
+            <h5 class="card-header">Server Details
+                <a href="javascript:hideElement()" id="hideServerCard" class="hideServerDivCard float-right" title="Hide">
+                    <i class="fa fa-times" aria-hidden="true" style="color:red"></i>
+                </a>
+            </h5>
+            <form id="serverForm">
+                <div class="card-body">
+                        <div class="form-row">
+                            <div class="form-group col-md-4">
+                              <label>Server Name</label>
+                              <input type="text" name="servername" class="form-control" placeholder="Server Name" required>
+                            </div>
+                            <div class="form-group col-md-4">
+                              <label>User Name</label>
+                              <input type="text" name="username" class="form-control" placeholder="User Name" required>
+                            </div>
+                            <div class="form-group col-md-4">
+                              <label>Password</label>
+                              <input type="password" name="password" class="form-control" placeholder="Password" required>
+                            </div>
+                          </div>
+                </div>
+                <button id="saveServerDetails" class="btn btn-primary float-right" style="margin-right: 10px;margin-bottom: 10px">Save</button>
+            </form>
+        </div>
+
+        <br/>
+
+        <div class="card" id="serverList">
+            <h5 class="card-header"> Server List
+                 <button class="selectedServerBtn btn btn-info float-right" title="Select Server"><i class="fa fa-eye" aria-hidden="true"></i></button>
+
+                 <button class="serverFormDivBtn btn btn-primary float-right" title="Add Server"><i class="fa fa-plus" aria-hidden="true"></i></button>
+             </h5>
+            <div class="card-body">
+
+            <table id="example" class="display table table-bordered " style="width:100%">
+                <thead>
+                    <tr>
+                        <th></th>
+                        <th>Server Name</th>
+                        <th>Username</th>
+                        <th>Password</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                </tbody>
+            </table>
+        </div>
+        </div>
+        <br/>
+
+        <div class="alert" id="alertScrollMsg" role="alert"></div>
+
+        <div class="card">
+            <h5 class="card-header"> Server Info
+                 <a href="javascript:downloadPdf()" class="serverFormDivBtn btn btn-primary float-right" title="Download PDF"><i class="fa fa-file-pdf-o" aria-hidden="true"></i></a>
+                  <a href="javascript:downloadExcel()" class="ExportBtn btn btn-primary float-right" title="Download Excel"><i class="fa fa-file-excel-o" aria-hidden="true"></i></a>
+             </h5>
+             <div id="severtInfoList" class="card-body"></div>
+       </div>
+    </div>
+
+    <div id="editor"></div>
+
+    <script type="text/javascript">
+        const Dexie = require('dexie');
+        var $ = require("jquery");
+        var html2canvas = require('html2canvas');
+        var dt = require( 'datatables.net' )();
+        require('pdfmake/build/pdfmake.js');
+        var pdfFonts = require('pdfmake/build/vfs_fonts.js');
+        const tt = require('electron-tooltip')
+        pdfMake.vfs = pdfFonts.pdfMake.vfs;
+
+    </script>
+    <script src="./js/dataTables.checkboxes.min.js"></script>
+
+    <script>
+        function hideElement() {
+            $("#serverFormDiv").hide();
+        }
+
+        var request = require('request').defaults({strictSSL: false});
+        var apiSkeleton = [
+            {
+                method:"GET",
+                apiUrl: "/api/v310/datastore/default/statsSummary",
+                dataAttr:[
+                    {
+                        unique:"disksCount",
+                        data:"disksCount"
+                    },
+                    {
+                        unique:'vmsCount',
+                        data:'vmsCount'
+                    },
+                    {
+                        unique:'operationsTotalIops',
+                        data:'operationsTotalIops'
+                    },
+                    {
+                        unique:'throughputTotalMBps',
+                        data:'throughputTotalMBps'
+                    },
+                    {
+                        unique:'latencyStorageMs',
+                        data:'latencyStorageMs'
+                    },
+                    {
+                        unique:'spaceTotalGiB',
+                        data:['spaceTotalGiB'],
+                        expression: function(spaceTotalGiB){
+                            if(spaceTotalGiB){
+                                return (spaceTotalGiB / 1024).toFixed(2) + ' TB';
+                            }
+                            return spaceTotalGiB;
+                        }
+                    },
+                    {
+                        unique:'spaceUsedPhysicalGiB',
+                        data:['spaceUsedPhysicalGiB'],
+                        expression: function(spaceUsedPhysicalGiB){
+                            if(spaceUsedPhysicalGiB){
+                                if (spaceUsedPhysicalGiB > 1024) {
+                                    return (spaceUsedPhysicalGiB / 1024).toFixed(2) + ' TB';
+                                }
+                                return (spaceUsedPhysicalGiB).toFixed(2) + ' GB';
+                            }
+                            return spaceUsedPhysicalGiB;
+                        }
+                    },
+                    {
+                        unique:'spaceRemainingPhysicalGiB',
+                        data:['spaceRemainingPhysicalGiB'],
+                        expression: function(spaceRemainingPhysicalGiB){
+                            if(spaceRemainingPhysicalGiB){
+                                return (spaceRemainingPhysicalGiB / 1024).toFixed(2) + ' TB';
+                            }
+                            return spaceRemainingPhysicalGiB;
+                        }
+                    },
+                    {
+                        unique:'logicalSpaceTotalGiB',
+                        data:['spaceSavingsFactor', 'spaceTotalGiB'],
+                        expression:function(spaceSavingsFactor, spaceTotalGiB){
+                            console.log('logical2',((spaceSavingsFactor * spaceTotalGiB) / 1024).toFixed(2) + ' TB');
+                            var logicalTotalGB = ((spaceSavingsFactor * spaceTotalGiB) / 1024).toFixed(2);
+                            if (isNaN(logicalTotalGB)) {
+                                return '<i class="fa fa-lg fa-times-circle" aria-hidden="true"></i>';
+                            }
+                            return logicalTotalGB + ' TB';
+                        }
+                    },
+                    {
+                        unique:'logicalUniqueSpaceUsedGiB',
+                        data:['spaceSavingsFactor', 'spaceUsedPhysicalGiB'],
+                        expression:function(spaceSavingsFactor, spaceUsedPhysicalGiB){
+                            var logicalUsedGB = ((spaceSavingsFactor * spaceUsedPhysicalGiB) / 1024).toFixed(2) ;
+                            if (isNaN(logicalUsedGB)) {
+                                return '<i class="fa fa-lg fa-times-circle" aria-hidden="true"></i>';
+                            }
+                            return logicalUsedGB +' TB';
+                        }
+                    },
+                    {
+                        unique:'spaceRemainingLogicalGiB',
+                        data:['spaceSavingsFactor', 'spaceRemainingPhysicalGiB'],
+                        expression:function(spaceSavingsFactor, spaceRemainingPhysicalGiB){
+                             var logicalRemainingGB = ((spaceSavingsFactor * spaceRemainingPhysicalGiB) / 1024).toFixed(2);
+                             if (isNaN(logicalRemainingGB)) {
+                                return '<i class="fa fa-lg fa-times-circle" aria-hidden="true"></i>'
+                             }
+                            return logicalRemainingGB + ' TB';
+                        }
+                    },
+                    {
+                        unique:'spaceSavingsFactor',
+                        data:['spaceSavingsFactor'],
+                        expression:function(spaceSavingsFactor){
+                            if(spaceSavingsFactor)
+                                return spaceSavingsFactor.toFixed(1) +' X';
+                            return spaceSavingsFactor;
+                        }
+                    }
+                ]
+            },
+            {
+                method:"GET",
+                apiUrl: "/api/v310/snapshot",
+                dataAttr:[
+                    {
+                        unique:'snapshot',
+                        data:'total'
+                    }
+                ]
+            },
+            {
+                method:"GET",
+                apiUrl: "/api/v310/servicegroup",
+                dataAttr:[
+                    {
+                        unique:'servicegroup',
+                        data:'total'
+                    }
+                ]
+            }
+
+        ]
+
+        function buildRequestOptions(skeleton, servername, headers = {}, body={}){
+
+            var _headers = {
+                'Content-Type': 'application/json',
+            };
+
+            var _body = {};
+
+            return {
+                    'method': skeleton['method'],
+                    'url': 'https://'+servername + skeleton['apiUrl'],
+                    'headers': Object.assign(_headers, headers),
+                    'body': Object.assign(_body, body),
+                    'json': true
+                };
+        }
+
+        function fetchData(collections, keys){
+
+             if(Array.isArray(keys['data'])){
+                var argument = [];
+                keys['data'].forEach(function(value){
+
+                    argument.push(collections[value]);
+                });
+            }
+
+            if (keys.hasOwnProperty('expression')){
+                return keys['expression'].apply(this, argument);
+            }
+
+            return collections[keys['data']];
+        }
+
+        function hitMeHard(item, option){
+
+            var servername = item['servername'];
+
+            var loginSkeleton = {
+                method:"POST",
+                apiUrl: "/api/v310/session/login",
+                body:{
+                    'username':item['username'],
+                    'password':item['password'],
+                    'typeId':'com.tintri.api.rest.vcommon.dto.rbac.RestApiCredentials'
+                }
+            };
+            var loginoptions = buildRequestOptions(loginSkeleton, servername, {}, loginSkeleton['body']);
+            request(loginoptions, function(error, response, body){
+                if(error){
+                    alert("Failed to login VMStore (" + servername + ")", error);
+                    throw new Error(error);
+                }
+                var cookie = response.headers['set-cookie'];
+
+                console.log("Logged into VMStore (" + servername + ") successfully");
+
+                serverInfoTemplate(servername);
+                apiSkeleton.forEach(function(skeleton){
+
+                    var headers ={
+                        'Cookie': cookie
+                    }
+                    var reqOptions = buildRequestOptions(skeleton, servername, headers);
+                    request(reqOptions, function(error, response, body){
+                        if(error) throw new Error(error);
+
+                        skeleton['dataAttr'].forEach(function(item){
+
+                            // console.log(fetchData(body,item));
+
+                            var result = fetchData(body,item);
+                            if(!result){
+                                result = '<i class="fa fa-lg fa-times-circle" aria-hidden="true"></i>';
+                            }
+
+                            $('#' + sanitizeServerName(servername))
+                            .find('.' + item['unique'])
+                            .html('<b><font size="4">'+result+'</font></b>');
+                        });
+                    });
+                });
+                if (option ==='multiple') {
+                        $('#severtInfoList')[0].scrollIntoView(); 
+                } else {
+                    $('#' + sanitizeServerName(servername))[0].scrollIntoView();                    
+                }
+            });
+        }
+
+        function sanitizeServerName(servername){
+            var servernameArr = servername.split('.')
+            return servernameArr.join('_');
+        }
+
+        function serverInfoTemplate(servername){
+            console.log('==',sanitizeServerName(servername));
+
+            var html = '<div class="card serverInfo" id="'+ sanitizeServerName(servername) +'">';
+            html += '<h5 class="card-header vmstore"> '+ servername +' ';
+            html += '<a href="" onclick="removeElement(this); return false;" id="'+ sanitizeServerName(servername) +'"';
+            html += 'class="removeDivCard float-right" title="Remove">'; 
+            html += '<i class="fa fa-times" aria-hidden="true" style="color:red"></i></a>'
+            html += '</h5>';
+            html += '<div class="card-body text-center">';
+            html += '<div class="card-group">';
+            html += '<div class="card border bg-warning">';
+            html += '<h5 class="card-header">';
+            html += '<i class="fa fa-desktop" aria-hidden="true"></i> ';
+            html += 'VM Count';
+            html += '</h5>';
+            html += '<div class="card-body ">';
+            html += '<p class="card-text vmsCount">';
+            html += '<i class="fa fa-spinner fa-pulse " aria-hidden="true"></i></p>';
+            html += '</div>';
+            html += '</div>';
+            html += '<div class="card border text-white bg-primary">';
+            html += '<h5 class="card-header"> ';
+            html += '<i class="fa fa-hdd-o" aria-hidden="true"></i> ';
+            html += 'Virtual Disk';
+            html += '</h5>';
+            html += '<div class="card-body">';
+            html += '<p class="card-text disksCount">';
+            html += '<i class="fa fa-spinner fa-pulse " aria-hidden="true"></i></p>';
+            html += '</div>';
+            html += '</div>            ';
+            html += '<div class="card border text-white bg-success">';
+            html += '<h5 class="card-header">';
+            html += '<i class="fa fa-camera" aria-hidden="true"></i> ';
+            html += 'Snapshot';
+            html += '</h5>';
+            html += '<div class="card-body">';
+            html += '<p class="card-text snapshot">';
+            html += '<i class="fa fa-spinner fa-pulse " aria-hidden="true"></i></p>';
+            html += '</div>';
+            html += '</div>';
+            html += '<div class="card border text-white bg-danger">';
+            html += '<h5 class="card-header text-nowrap">';
+            html += '<i class="fa fa-users" aria-hidden="true"></i> ';
+            html += 'Service Group';
+            html += '</h5>';
+            html += '<div class="card-body">';
+            html += '<p class="card-text servicegroup">';
+            html += '<i class="fa fa-spinner fa-pulse " aria-hidden="true"></i></p>';
+            html += '</div>';
+            html += '</div>';
+            html += '<div class="card border border-secondary">';
+            html += '<h5 class="card-header text-white bg-secondary ">Physical Space</h5>';
+            html += '<table class="table table-bordered table-striped table-sm">';
+            html += '<tbody>';
+            html += '<tr>';
+            html += '<td>Total</td>';
+            html += '<th class="spaceTotalGiB">';
+            html += '<i class="fa fa-spinner fa-pulse " aria-hidden="true"></i>';
+            html += '</th>';
+            html += '</tr>';
+            html += '<tr>';
+            html += '<td>Used</td>';
+            html += '<th class="spaceUsedPhysicalGiB">';
+            html += '<i class="fa fa-spinner fa-pulse " aria-hidden="true"></i>';
+            html += '</th>';
+            html += '</tr>';
+            html += '<tr>';
+            html += '<td>Free</td>';
+            html += '<th class="spaceRemainingPhysicalGiB">';
+            html += '<i class="fa fa-spinner fa-pulse " aria-hidden="true"></i>';
+            html += '</th>';
+            html += '</tr>';
+            html += '</tbody>';
+            html += '</table>';
+            html += '</div>';
+            html += '</div>';
+            html += '<div class="card-group">';
+            html += '<div class="card border text-white bg-danger">';
+            html += '<h5 class="card-header">';
+            html += '<i class="fa fa-exchange" aria-hidden="true"></i> ';
+            html += 'IOPS';
+            html += '</h5>';
+            html += '<div class="card-body">';
+            html += '<p class="card-text operationsTotalIops">';
+            html += '<i class="fa fa-spinner fa-pulse " aria-hidden="true"></i></p>';
+            html += '</div>';
+            html += '</div>';
+            html += '<div class="card border text-white bg-success">';
+            html += '<h5 class="card-header">';
+            html += '<i class="fa fa-usb" aria-hidden="true"></i> ';
+            html += 'Throughput';
+            html += '</h5>';
+            html += '<div class="card-body">';
+            html += '<p class="card-text throughputTotalMBps">';
+            html += '<i class="fa fa-spinner fa-pulse " aria-hidden="true"></i></p>';
+            html += '</div>';
+            html += '</div>';
+            html += '<div class="card border  text-white bg-primary">';
+            html += '<h5 class="card-header">';
+            html += '<i class="fa fa-exclamation-circle" aria-hidden="true"></i> '
+            html += 'Latency</h5>';
+            html += '<div class="card-body latencyStorageMs">';
+            html += '<p class="card-text">';
+            html += '<i class="fa fa-spinner fa-pulse " aria-hidden="true"></i></p>';
+            html += '</div>';
+            html += '</div>';
+            html += '<div class="card border bg-warning">';
+            html += '<h5 class="card-header text-nowrap">';
+            html += '<i class="fa fa-adjust" aria-hidden="true"></i> ';
+            html += 'Spacing Factor</h5>';
+            html += '<div class="card-body">';
+            html += '<p class="card-text spaceSavingsFactor">';
+            html += '<i class="fa fa-spinner fa-pulse " aria-hidden="true"></i> </p>';
+            html += '</div>';
+            html += '</div>';
+            html += '<div class="card border border-info">';
+            html += '<h5 class="card-header border text-white bg-info ">Logical Space</h5>';
+            html += '<table class="table table-bordered table-striped table-sm">';
+            html += '<tbody>';
+            html += '<tr>';
+            html += '<td>Total</td>';
+            html += '<th class="logicalSpaceTotalGiB">';
+            html += '<i class="fa fa-spinner fa-pulse " aria-hidden="true"></i>';
+            html += '</th>';
+            html += '</tr>';
+            html += '<tr>';
+            html += '<td>Used</td>';
+            html += '<th class="logicalUniqueSpaceUsedGiB">';
+            html += '<i class="fa fa-spinner fa-pulse " aria-hidden="true"></i>';
+            html += '</th>';
+            html += '</tr>';
+            html += '<tr>';
+            html += '<td>Free</td>';
+            html += '<th class="spaceRemainingLogicalGiB">';
+            html += '<i class="fa fa-spinner fa-pulse " aria-hidden="true"></i>';
+            html += '</th>';
+            html += '</tr>';
+            html += '</tbody>';
+            html += '</table>';
+            html += '</div>';
+            html += '</div>';
+            html += '<br/>';
+            html += '</div> ';
+            html += '</div> ';
+
+            console.log($('#'+ sanitizeServerName(servername)).length);
+
+            if($('#'+ sanitizeServerName(servername)).length == 0){
+                // $('#'+ sanitizeServerName(servername)).remove();
+                 $('#severtInfoList').append(html);
+            } else {
+                // $('#severtInfoList').append(html);
+            }
+        }
+
+        function downloadPdf() {
+
+            var canvas = [];
+
+            $.each($(".serverInfo"), function(key, element){
+
+                canvas.push(html2canvas($(element)[0]));
+            });
+
+            Promise.all(canvas).then(function(values) {
+
+                var content = [];
+
+                $.each(values, function(e, image){
+                    content.push({
+                        image: image.toDataURL(),
+                        width: 510
+                    });
+                });
+
+                var docDefinition = {
+                    pageSize: 'A4',
+                    pageOrientation: 'portrait',
+                    content: content,
+                    footer: {
+                        columns: [
+                            {
+                                text: 'Generated @ '+ new Date(),
+                                alignment: 'right',
+                                fontSize: 8,
+                                margin: [20, 20]
+                            }
+                        ]
+                    }
+                };
+                pdfMake.createPdf(docDefinition).download("VMStore-server-details.pdf", function() {
+                    setTimeout(function(){
+                        alert('PDF is downloaded');
+                    },5000); 
+                });                
+                
+            });
+        }
+
+        function downloadExcel() {
+            var excelData = loadExcelData();
+            setTimeout(function(){},2000); 
+            console.log('lll',excelData)
+            if (excelData.length == 0) {
+                alert('Please select VMstore machine');
+                return;
+            }
+            // console.log(excelData)
+            var csv = 'ServerName, VMCount, Virtual Disck, Snapshot, Service Group, Physcial Total Space, Physical Space Used, Physcial Free Space, IOPS, Throughput, Latency, Spacing Factor, Logical Total Space, Logical Used Space, Logical Free Space\n';
+            excelData.forEach(function(row) {
+                csv += row.join(',');
+                csv += "\n";
+            });
+
+            console.log(csv);
+            var hiddenElement = document.createElement('a');
+            hiddenElement.href = 'data:text/csv;charset=utf-8,' + encodeURI(csv);
+            hiddenElement.target = '_blank';
+            hiddenElement.download = 'VMstoreReporter.csv';
+            hiddenElement.click();
+               
+        }
+
+        function loadExcelData() {
+            var data = [];
+            var excelData = [];
+            var testimonials = document.querySelectorAll('.serverInfo');
+            testimonials.forEach(function(item,value){
+                serverId = $(item).attr("id");
+                data.push(serverId);
+                data.push($('#'+serverId).find('.vmsCount').text());
+                data.push($('#'+serverId).find('.disksCount').text());
+                data.push($('#'+serverId).find('.snapshot').text());
+                data.push($('#'+serverId).find('.servicegroup').text());
+                data.push($('#'+serverId).find('.spaceTotalGiB').text());
+                data.push($('#'+serverId).find('.spaceUsedPhysicalGiB').text());
+                data.push($('#'+serverId).find('.spaceRemainingPhysicalGiB').text());
+                data.push($('#'+serverId).find('.operationsTotalIops').text());
+                data.push($('#'+serverId).find('.throughputTotalMBps').text());
+                data.push($('#'+serverId).find('.latencyStorageMs').text());
+                data.push($('#'+serverId).find('.spaceSavingsFactor').text());
+                data.push($('#'+serverId).find('.logicalSpaceTotalGiB').text());
+                data.push($('#'+serverId).find('.logicalUniqueSpaceUsedGiB').text());
+                data.push($('#'+serverId).find('.spaceRemainingLogicalGiB').text());
+                excelData.push(data);
+                data = [];
+            });
+            setTimeout(function(){},2000); 
+            console.log('excel',excelData);
+            return excelData;
+        }
+
+        function removeElement(obj) {
+            $('#'+ obj.id).remove();            
+        }
+        
+        // DB
+        var db = new Dexie('tintri_tool');
+        db.version(1).stores({
+             vmstores: 'servername,username,password'
+        });
+        db.open().catch(function (err) {
+            console.error (err.stack || err);
+        });
+
+        // VMStore
+        var VMStore = db.vmstores.defineClass ({
+            servername: String,
+            username: String,
+            password: String
+        })
+        VMStore.prototype.log = function (){
+            console.log("I am from Class");
+            console.log(JSON.stringify(this));
+        }
+
+        var dd = [
+            {'servername':'tafm17','username':'admin','password':'tintri99'},
+            {'servername':'tafs19','username':'admin','password':'tintri99'},
+            {'servername':'tafbv15','username':'admin','password':'tintri99'},
+            {'servername':'tafbv4','username':'admin','password':'tintri99'},
+            {'servername':'tafbh17','username':'admin','password':'tintri99'},
+            {'servername':'tafbh45','username':'admin','password':'tintri99'},
+            {'servername':'tafbh46','username':'admin','password':'tintri99'},
+            {'servername':'tafh6','username':'admin','password':'tintri99'},
+            {'servername':'tafhr2','username':'admin','password':'tintri99'},
+            {'servername':'tafbs14','username':'admin','password':'tintri99'},
+            {'servername':'tbolth5','username':'admin','password':'tintri99'}
+
+        ]
+        // db.vmstores.bulkAdd(dd);
+
+        $("#serverFormDiv").hide();
+
+        // List Server Details
+        var serverTable = $('#example').DataTable({
+            ajax: function(data, callback,settings){
+                db.vmstores.toCollection()
+                .toArray(function(d){
+                    callback(d);
+                });
+                settings.sAjaxDataProp = '';
+            },
+            // "pageLength":5,
+            "lengthMenu": [[ 5, 10, 25, 50, 75, 100,-1],[ 5, 10, 25, 50, 75, 100,"All"]],
+            "columns": [
+                { "data": "servername" },
+                { "data": "servername" },
+                { "data": "username" },
+                { "data": "password" }
+            ],
+            "columnDefs": [
+                {
+                    'targets':0,
+                    'checkboxes':{
+                        'selectRow':true
+                    }
+                },
+                {
+                    'targets':3,
+                    'render': function(){
+                        return "*****";
+                    }
+                },
+                {
+                    'targets':4,
+                    "render": function ( data, type, row ) {
+
+                        var btn = '<div class="btn-group" role="group">';
+                        btn += '<a data-servername="'+row['servername']+'" title="View" class="viewServer btn btn-info"><i class="fa fa-eye" aria-hidden="true"></i></a>';
+                        btn += '<a data-servername="'+row['servername']+'" title="Edit" class="serverFormDivBtn editServer btn btn-warning"><i class="fa fa-pencil-square-o" aria-hidden="true"></i></a>';
+                        btn += '<a data-servername="'+row['servername']+'" title="Delete" class="removeServer btn btn-danger"><i class="fa fa-trash" aria-hidden="true"></i></a>';
+                        btn += '</div>';
+                        return btn;
+                    }
+                }
+            ] ,
+            "select": {
+                'style':'multi',
+            }
+        });
+
+        function alertMsg(message, status){
+
+            $("#alertMsg").removeClass().addClass(" alert alert-"+status).html(message).show();
+            setTimeout(function(){
+                $("#alertMsg").hide();
+             }, 3000);
+        }
+
+        // Insert Server Details
+        $(document).on('click', ".serverFormDivBtn", function(e){
+            if(!$("#serverFormDiv").is(":visible")){
+               $("#serverFormDiv").show();
+            }
+        });
+
+        $(document).on('submit', "form#serverForm", function(e){
+            e.preventDefault(e);
+            return false;
+        })
+
+        var selectedData = [];
+        $(document).on('click',".selectedServerBtn",function(e){           
+            selectedData = [];
+            var rows_selected = serverTable.column(0).checkboxes.selected();
+            var machine_list = $.each(rows_selected, function(index, rowId){
+                selectedData.push(rowId);
+            });
+            if (selectedData.length > 0 ) {
+                selectedData.forEach(function(servername){
+                    db.vmstores.get(servername, function(item){
+                        console.log(item);
+                        hitMeHard(item,'multiple');
+                    });
+                });
+            } else {
+                alert('Select the VMStore');
+            }
+
+        });
+
+        $(document).on('click', '#saveServerDetails',function(e){
+            var form = $("form#serverForm");
+
+            if(form[0].checkValidity()){
+                var arrayData = form.serializeArray();
+                var jsonData = {};
+
+                $.map(arrayData, function(n, i){
+                    jsonData[n['name']] = n['value'];
+                });
+
+                db.vmstores.put(jsonData)
+                .then(function(e){
+                    $("#serverFormDiv").hide();
+                    form[0].reset();
+                    serverTable.ajax.reload();
+                    alertMsg("Server Details Saved Successfully","success");
+                });
+            }
+            alertMsg("Please fill all the details","danger");
+        });
+
+
+        $(document).on('click', '.editServer', function(){
+            var servername = $(this).attr('data-servername');
+
+            db.vmstores.get(servername, function(item){
+
+                $.each(item, function(key, value) {
+                    var ctrl = $('[name='+key+']', $("form#serverForm"));
+                    switch(ctrl.prop("type")) {
+                        case "radio": case "checkbox":
+                            ctrl.each(function() {
+                                if($(this).attr('value') == value) $(this).attr("checked",value);
+                            });
+                            break;
+                        default:
+                            ctrl.val(value);
+                    }
+                });
+            });
+        });
+
+        // Delete Server Details
+        $(document).on('click', ".removeServer", function(e){
+            var servername = $(this).attr('data-servername');
+            if (confirm('Are you sure you want to delete '+servername +' server?')) {
+                // Delete VMStores
+                db.vmstores.delete(servername).
+                then(function(e){
+                    db.vmstores.get(servername, function(item){
+                        if(typeof item === 'undefined'){
+                            alertMsg(servername + " Removed Successfully", "success");
+                            serverTable.ajax.reload();
+                        }
+                        else{
+                            alertMsg(servername + " Removed Failed", "danger");
+                        }
+                    });
+                });
+            }
+        });
+
+        $(document).on('click', ".viewServer", function(){
+            var servername = $(this).attr('data-servername');
+            db.vmstores.get(servername, function(item){
+                console.log(item);
+                hitMeHard(item,'view');
+            });
+            // var documentHeight=document.documentElement.offsetHeight;
+            // var viewportHeight=window.innerHeight;
+            // window.scrollTo(0,documentHeight-viewportHeight);
+        });
+
+        function alertScroll() {
+            $("#alertScrollMsg").removeClass().addClass(" alert alert-success").html("Scroll down to view server details").show();
+                setTimeout(function(){
+                    $("#alertScrollMsg").hide();
+                 }, 3000);
+        }
+    </script>
+  </body>
+</html>

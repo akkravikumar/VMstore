@@ -242,7 +242,7 @@
                         }
                     }
                 ]
-            },
+            }/*,
             {
                 method:"GET",
                 apiUrl: "/api/v310/snapshot",
@@ -252,7 +252,7 @@
                         data:'total'
                     }
                 ]
-            },
+            }*/,
             {
                 method:"GET",
                 apiUrl: "/api/v310/servicegroup",
@@ -262,12 +262,65 @@
                         data:'total'
                     }
                 ]
+            },
+            {
+                method:"GET",
+                apiUrl: "/api/v310/appliance/default/encryptionInfo",
+                dataAttr:[
+                    {
+                        unique:'isFipsEncryptionEnabled',
+                        data:['isFipsEncryptionEnabled'],
+                        expression:function(isFipsEncryptionEnabled){
+                            if(!isFipsEncryptionEnabled)
+                                return 'Disabled';
+                            else
+                                return "Enabled"                            
+                        }
+                    }
+                ]
+            },
+            {
+                method:"GET",
+                apiUrl: "/api/v310/datastore/default/replicationPath",
+                dataAttr:[
+                    {
+                        unique:'topology',
+                        data:'displayName'
+                    }
+                ]
+            },
+            {
+                method:"GET",
+                apiUrl: "/api/v310/servicegroup/",
+                dataAttr:[
+                    {
+                        unique:['syncCount','quotaCount','asyncCount','clouldCount'],
+                        data:['items'],
+                        expression:function(items){                            
+                            return items;                          
+                        }
+                    }
+                ]
             }
+        ]
 
+        var apiSGSkeleton = [            
+            {
+                method:"GET",
+                apiUrl: "/api/v310/vm/",
+                dataAttr:[
+                    {
+                        unique:'replication',
+                        data:['replication'],
+                        expression:function(replication){
+                            return replication;                      
+                        }
+                    }
+                ]
+            }
         ]
 
         function buildRequestOptions(skeleton, servername, headers = {}, body={}){
-
             var _headers = {
                 'Content-Type': 'application/json',
             };
@@ -284,14 +337,20 @@
         }
 
         function fetchData(collections, keys){
+            if (Array.isArray(collections)) {
+                var str = "";
+                collections.forEach(function(item){
+                    str += item[keys['data']] + '<br>'
+                });
+                return str;
+            }
 
-             if(Array.isArray(keys['data'])){
+            if(Array.isArray(keys['data'])){
                 var argument = [];
                 keys['data'].forEach(function(value){
-
                     argument.push(collections[value]);
                 });
-            }
+            }            
 
             if (keys.hasOwnProperty('expression')){
                 return keys['expression'].apply(this, argument);
@@ -326,7 +385,7 @@
                 serverInfoTemplate(servername);
                 apiSkeleton.forEach(function(skeleton){
 
-                    var headers ={
+                    var headers = {
                         'Cookie': cookie
                     }
                     var reqOptions = buildRequestOptions(skeleton, servername, headers);
@@ -334,17 +393,67 @@
                         if(error) throw new Error(error);
 
                         skeleton['dataAttr'].forEach(function(item){
-
-                            // console.log(fetchData(body,item));
+                            // console.log('==',item);
+                            // console.log('++',body);                             
 
                             var result = fetchData(body,item);
                             if(!result){
                                 result = '<i class="fa fa-lg fa-times-circle" aria-hidden="true"></i>';
                             }
+                            console.log( item['unique'],fetchData(body,item));
+                            setServerValues(servername,item['unique'],result);
+                            // $('#' + sanitizeServerName(servername))
+                            // .find('.' + item['unique'])
+                            // .html('<b><font size="4">'+result+'</font></b>');
 
-                            $('#' + sanitizeServerName(servername))
-                            .find('.' + item['unique'])
-                            .html('<b><font size="4">'+result+'</font></b>');
+                            if (Array.isArray(item['unique'])) {       
+                                setServerValues(servername,'syncCount','0');
+                                setServerValues(servername,'asyncCount','0');
+                                setServerValues(servername,'cloudCount','0');
+                                setServerValues(servername,'quotaCount','0');                    
+                                var syncCount = 0, quotaCount = 0, clouldCount = 0, asyncCount = 0;
+                                result.forEach(function(resultItem) {
+                                    if(resultItem.hasOwnProperty('syncReplPolicy')){
+                                        syncCount = syncCount + 1;
+                                        setServerValues(servername,'syncCount',syncCount);
+                                    } else if (resultItem.hasOwnProperty('quotaPolicy')) {
+                                        quotaCount = quotaCount + 1;
+                                        setServerValues(servername,'quotaCount',quotaCount);
+                                    } else {
+                                        var members = resultItem.members; 
+                                        for (var i = 0; i < members.length; i++) {
+                                            // start
+                                            apiSGSkeleton.forEach(function(sgSkeleton){
+                                                var initApiUrl = sgSkeleton['apiUrl'];
+                                                sgSkeleton['apiUrl'] = initApiUrl + members[i]['memberId'];
+                                                var reqSgOptions = buildRequestOptions(sgSkeleton, servername, headers);
+                                                sgSkeleton['apiUrl'] = initApiUrl;
+                                                request(reqSgOptions, function(error, response, body){
+                                                    if(error) throw new Error(error);
+                                                    sgSkeleton['dataAttr'].forEach(function(item){
+                                                        var result = fetchData(body,item);
+                                                        for (var i = 0; i < result.configurationsOutgoing.length; i++) {
+                                                            var configOutGoing = result.configurationsOutgoing[i].path;
+                                                            if (configOutGoing.hasOwnProperty('cloudReplDestination')) {
+                                                                clouldCount = clouldCount + 1;
+                                                                setServerValues(servername,'cloudCount',clouldCount);
+                                                            } else {
+                                                                asyncCount = asyncCount + 1;
+                                                                setServerValues(servername,'asyncCount',asyncCount);
+                                                            }
+                                                            break;
+                                                        }
+                                                    });
+                                                });
+                                            });
+                                            //end
+                                            break;
+                                        }                                                                                
+                                    }
+                                });
+                                
+                                
+                            }
                         });
                     });
                 });
@@ -354,6 +463,12 @@
                     $('#' + sanitizeServerName(servername))[0].scrollIntoView();                    
                 }
             });
+        }
+
+        function setServerValues(servername, uniqueName, field) {
+            $('#' + sanitizeServerName(servername))
+                                    .find('.'+uniqueName)
+                                    .html('<b><font size="4">'+field+'</font></b>');  
         }
 
         function sanitizeServerName(servername){
@@ -503,6 +618,61 @@
             html += '</table>';
             html += '</div>';
             html += '</div>';
+            //Service groups Start from here 
+            html += '<div class="card-group">';
+            html += '<div class="card border bg-warning">';
+            html += '<h5 class="card-header">';
+            html += '<i class="fa fa-desktop" aria-hidden="true"></i> ';
+            html += 'FIPS Status';
+            html += '</h5>';
+            html += '<div class="card-body ">';
+            html += '<p class="card-text isFipsEncryptionEnabled">';
+            html += '<i class="fa fa-spinner fa-pulse " aria-hidden="true"></i></p>';
+            html += '</div>';
+            html += '</div>';
+            html += '<div class="card border text-white bg-primary">';
+            html += '<h5 class="card-header"> ';
+            html += '<i class="fa fa-hdd-o" aria-hidden="true"></i> ';
+            html += 'Topology';
+            html += '</h5>';
+            html += '<div class="card-body">';
+            html += '<p class="card-text topology">';
+            html += '<i class="fa fa-spinner fa-pulse " aria-hidden="true"></i></p>';
+            html += '</div>';
+            html += '</div>';                    
+            html += '<div class="card border border-secondary">';
+            html += '<h5 class="card-header text-white bg-secondary ">Service Group</h5>';
+            html += '<table class="table table-bordered table-striped table-sm">';
+            html += '<tbody>';
+            html += '<tr>';
+            html += '<td>Sync</td>';
+            html += '<th class="syncCount">';
+            html += '<i class="fa fa-spinner fa-pulse " aria-hidden="true"></i>';
+            html += '</th>';
+            html += '</tr>';
+            html += '<tr>';
+            html += '<td>ASync</td>';
+            html += '<th class="asyncCount">';
+            html += '<i class="fa fa-spinner fa-pulse " aria-hidden="true"></i>';
+            html += '</th>';
+            html += '</tr>';
+            html += '<tr>';
+            html += '<td>Cloud</td>';
+            html += '<th class="cloudCount">';
+            html += '<i class="fa fa-spinner fa-pulse " aria-hidden="true"></i>';
+            html += '</th>';
+            html += '</tr>';
+            html += '<tr>';
+            html += '<td>Quota</td>';
+            html += '<th class="quotaCount">';
+            html += '<i class="fa fa-spinner fa-pulse " aria-hidden="true"></i>';
+            html += '</th>';
+            html += '</tr>';
+            html += '</tbody>';
+            html += '</table>';
+            html += '</div>';
+            html += '</div>';
+            // Service groups end here           
             html += '<br/>';
             html += '</div> ';
             html += '</div> ';

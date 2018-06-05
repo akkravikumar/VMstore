@@ -11,7 +11,8 @@
         <link href="https://stackpath.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css" rel="stylesheet" integrity="sha384-wvfXpqpZZVQGK6TAh5PVlGOfQNHSoD2xbE+QkPxCAFlNEevoEH3Sl0sibVcOQVnN" crossorigin="anonymous">
         <link rel="stylesheet" href="./css/dataTables.checkboxes.css"/>
         <title>VMstore State Reporter</title>
-
+        <script type="text/javascript" src="./d3.min.js"></script>
+        <script> let d3 = window.jQuery = require('./d3.min.js') </script>        
         <style>
             .grid-container {
                 display: grid;
@@ -45,6 +46,12 @@
 
             .gridDiv{
                 margin:0 auto;
+            }
+
+            .link {
+              fill: none;
+              stroke: #ccc;
+              stroke-width: 4.5px;
             }
         </style>
     </head>
@@ -130,15 +137,14 @@
         var pdfFonts = require('pdfmake/build/vfs_fonts.js');
         const tt = require('electron-tooltip')
         pdfMake.vfs = pdfFonts.pdfMake.vfs;
-
     </script>
     <script src="./js/dataTables.checkboxes.min.js"></script>
-
+    <script src="d3.min.js"></script>    
     <script>
         function hideElement() {
             $("#serverFormDiv").hide();
         }
-
+        var SSH = require('simple-ssh');
         var request = require('request').defaults({strictSSL: false});
         var apiSkeleton = [
             {
@@ -242,7 +248,7 @@
                         }
                     }
                 ]
-            }/*,
+            },
             {
                 method:"GET",
                 apiUrl: "/api/v310/snapshot",
@@ -252,7 +258,7 @@
                         data:'total'
                     }
                 ]
-            }*/,
+            }/*,
             {
                 method:"GET",
                 apiUrl: "/api/v310/servicegroup",
@@ -262,7 +268,7 @@
                         data:'total'
                     }
                 ]
-            },
+            }*/,
             {
                 method:"GET",
                 apiUrl: "/api/v310/appliance/default/encryptionInfo",
@@ -342,7 +348,7 @@
                 collections.forEach(function(item){
                     str += item[keys['data']] + '<br>'
                 });
-                return str;
+                return collections;
             }
 
             if(Array.isArray(keys['data'])){
@@ -357,6 +363,191 @@
             }
 
             return collections[keys['data']];
+        }
+
+        function fetchMonitorData(item) { 
+            var exec = require('node-ssh-exec');
+            var servername = item['servername'];     
+            var username = 'root';     
+            var password =item['password'];
+
+            var config = {
+                host: servername,
+                username: username,
+                password: password
+            },
+            command = '/usr/tintri/bin/hamoncmd';
+            exec(config, command, function (error, response) {
+                if (error) {
+                    throw error;
+                }
+
+                /*var res1 = response.split(/\r?\n/);
+                res1 = res1.filter(function(e){return e});
+                
+                var curr = null;
+                var result = res1.reduce((acc, line) => {
+                    if(line.trim().length) {
+                        if (line.includes(' #')) {
+                            let [key, index] = line.split(' #');
+                            key = key.trim();
+                            index = +index;
+                            curr = {key, index};
+                            let a = acc[key] = acc[key] || [];
+                            a[index] = a[index] || {};
+                        } else {
+                            let [key, ...value] = line.split(':');
+                            value = value.join(':').trim();
+                            if (key.startsWith(' ')) {
+                                acc[curr.key][curr.index][key.trim()] = value;
+                            } else {
+                                acc[key.trim()] = value;
+                            }
+                        }
+                    }
+                    return acc;
+                }, {});
+                console.log('Response ====== ',JSON.stringify(result, null, 4));*/
+
+                var res = response.split(/\r?\n/);
+                res = res.filter(function(e){return e});
+                var myObject = {
+                    node : []
+                };
+                var nodeObject =[];
+                var j=0, k = 0, l=0;
+                var sampleArr = []
+                var loop = false;
+                res.forEach(function(itemValue){
+                // for (var i = 0; i < res.length; i++) {
+                    // var itemValue = res[i]
+                    if (itemValue.includes(':')) {
+                        var sp = itemValue.split(':');
+                        if (!loop) {
+                            myObject[sanitizeMonitorStatusName(sp.shift().trim())] = sp.join(':').trim();
+                        } else {
+                            if(nodeObject.length > 0) {
+                                if (j ==0) {
+                                    myObject.node[l] = nodeObject;
+                                    nodeObject = [];
+                                    l = l+1;
+                                }
+                            }
+
+                            nodeObject.push({[sanitizeMonitorStatusName(sp.shift().trim())] : sp.join(':').trim()});
+                            j = j+1;
+                            if (k > 0 && k == j) {
+                                myObject.node[l] = nodeObject;
+                                nodeObject = [];
+                            }
+                        }
+                    } else {
+                        loop = true;
+                        k=j;                        
+                        j = 0;
+                    }
+                });                                        
+                var jsonSkeleton = [
+                    {
+                        name : 'Pair_State'
+                    },
+                    {
+                        name : 'Pair_Errors'
+                    },
+                    {
+                        name : 'Pair_UpTime'
+                    },
+                    {
+                        name : 'Current_Node'
+                    }
+                ]
+                jsonSkeleton.forEach(function(jsonKey){    
+                    var result = myObject[jsonKey.name];
+                    if(!result){
+                        result = '<i class="fa fa-lg fa-times-circle" aria-hidden="true"></i>';
+                    }
+                    setServerValues(item['servername'],jsonKey.name, result);
+                });
+
+                var nodeLength = 0;
+                myObject.node.forEach(function(value){
+                    value.forEach(function(argument){
+                        var result = Object.values(argument)[0];
+                        if(!result){
+                            result = '<i class="fa fa-lg fa-times-circle" aria-hidden="true"></i>';
+                        }
+                        if (nodeLength == 0) {
+                            setServerValues(item['servername'],'primary_'+ Object.keys(argument)[0],result);
+                        } else {
+                            setServerValues(item['servername'],'secondary_'+ Object.keys(argument)[0],result);
+                        } 
+                    });
+                    nodeLength = nodeLength +1;
+                    /*for (var i = 0; i < value.length; i++) {
+                        var argument = value[i];
+                        var theKey = Object.keys(argument)[0];
+                        var result = Object.values(argument)[0];
+                        // var result = theValue[0];
+                        if(!result){
+                            console.log('result',result);
+                            result = '<i class="fa fa-lg fa-times-circle" aria-hidden="true"></i>';
+                        }
+                        if (nodeLength == 0) {
+                            setServerValues(item['servername'],'primary_'+theKey,result);
+                        } else {
+                            setServerValues(item['servername'],'secondary_'+theKey,result);
+                        }                       
+                    }*/
+                });                            
+            });            
+        }
+
+        function fetchCoresCrashes(item) {
+            var servername = item['servername'];     
+            var username = 'root';     
+            var password =item['password'];
+
+            var Client = require('ssh2-sftp-client');
+            var sftp = new Client();
+            sftp.connect({
+                host: servername,
+                username: username,
+                password: password
+            }).then(() => {
+                return sftp.list('/var/corefiles');
+            }).then((data) => {
+                var d = new Date();
+                d.setDate(d.getDate() - 10)
+                var content = '<table>';
+                var isFile = [];
+                data.forEach(function(fileData){
+                    if (fileData.name.includes('sqsh.gz') || fileData.name.includes('gz')) {
+                        var fileModifyDate = new Date(fileData.modifyTime);
+                        var validCore = fileModifyDate.getTime() >= d.getTime();
+                        if (validCore) {
+                            isFile.push(fileData.name);
+                            var dateFormatter = new Date(fileData.modifyTime);
+                            content += '<tr><td>'+ dateFormatter.toLocaleDateString() +' </td><td align="left">'+ fileData.name +'</td></tr>';
+                        } else {
+                            // console.log('The cores are expired',fileData.name);
+                        }
+                    } else {
+                        // console.log('no file',fileData);
+                    }
+                });
+                if (isFile.length == 0) {
+                    content = '<tr><td>No cores files available</td></tr>';
+                }
+                content+='</table>';
+                $('#'+sanitizeServerName(item['servername']) +'_cores').html(content);                
+            }).catch((err) => {
+                console.log(err, 'catch error');
+            });
+        }
+
+        function sanitizeMonitorStatusName(statusName){
+            var statusNameArr = statusName.split(' ');
+            return statusNameArr.join('_');
         }
 
         function hitMeHard(item, option){
@@ -383,6 +574,12 @@
                 console.log("Logged into VMStore (" + servername + ") successfully");
 
                 serverInfoTemplate(servername);
+                // Monitor Health status
+                fetchMonitorData(item);
+
+                // Cores/crashes files
+                fetchCoresCrashes(item);
+
                 apiSkeleton.forEach(function(skeleton){
 
                     var headers = {
@@ -392,20 +589,28 @@
                     request(reqOptions, function(error, response, body){
                         if(error) throw new Error(error);
 
-                        skeleton['dataAttr'].forEach(function(item){
-                            // console.log('==',item);
-                            // console.log('++',body);                             
-
+                        skeleton['dataAttr'].forEach(function(item){                           
                             var result = fetchData(body,item);
                             if(!result){
                                 result = '<i class="fa fa-lg fa-times-circle" aria-hidden="true"></i>';
                             }
                             console.log( item['unique'],fetchData(body,item));
-                            setServerValues(servername,item['unique'],result);
-                            // $('#' + sanitizeServerName(servername))
-                            // .find('.' + item['unique'])
-                            // .html('<b><font size="4">'+result+'</font></b>');
-
+                                                    
+                            if (Array.isArray(result)) {
+                                if (item['unique'] == 'topology') {
+                                    var topologyObj = {
+                                    };
+                                    var children = [];
+                                    topologyObj['name'] = servername;
+                                    for (var i = 0; i < result.length; i++) {
+                                        children.push({'name':result[i].displayName}); 
+                                    }
+                                    topologyObj.children = children;
+                                    makeTopologyDiagram(topologyObj);
+                                }                                
+                            }
+                            setServerValues(servername,item['unique'],result);                           
+                            // Service Groups
                             if (Array.isArray(item['unique'])) {       
                                 setServerValues(servername,'syncCount','0');
                                 setServerValues(servername,'asyncCount','0');
@@ -421,6 +626,10 @@
                                         setServerValues(servername,'quotaCount',quotaCount);
                                     } else {
                                         var members = resultItem.members; 
+                                        if (members.length == 0) {
+                                            setServerValues(servername,'cloudCount','Invalid');
+                                            setServerValues(servername,'asyncCount','Invalid'); 
+                                        }
                                         for (var i = 0; i < members.length; i++) {
                                             // start
                                             apiSGSkeleton.forEach(function(sgSkeleton){
@@ -448,11 +657,9 @@
                                             });
                                             //end
                                             break;
-                                        }                                                                                
+                                        }          
                                     }
-                                });
-                                
-                                
+                                });                                                            
                             }
                         });
                     });
@@ -476,14 +683,73 @@
             return servernameArr.join('_');
         }
 
-        function serverInfoTemplate(servername){
-            console.log('==',sanitizeServerName(servername));
+        function makeTopologyDiagram(topologyObj) {
+            d3.select("#"+sanitizeServerName(topologyObj.name)+"_viz").html("");
+            var vis = d3.select("#"+sanitizeServerName(topologyObj.name)+"_viz").append("svg:svg")
+              .attr("width", 400)
+              .attr("height", 100)
+              .append("svg:g")
+              .attr("transform", "translate(100, 0)"); // shift everything to the right
+         
+              // Create a tree "canvas"
+              var tree = d3.layout.tree()
+            .size([100,50]);
+         
+              var diagonal = d3.svg.diagonal()
+              // change x and y (for the left to right tree)
+              .projection(function(d) { return [d.y, d.x]; });
+         
+              // Preparing the data for the tree layout, convert data into an array of nodes
+              var nodes = tree.nodes(topologyObj);
+              // Create an array with all the links
+              var links = tree.links(nodes);
+         
+              console.log(topologyObj)
+              console.log(nodes)
+              console.log(links)
+         
+              var link = vis.selectAll("pathlink")
+              .data(links)
+              .enter().append("svg:path")
+              .attr("class", "link")
+              .attr("d", diagonal)
 
+              var node = vis.selectAll("g.node")
+              .data(nodes)
+              .enter().append("svg:g")
+              .attr("transform", function(d) { return "translate(" + d.y + "," + d.x + ")"; })
+         
+              // Add the dot at every node
+              node.append("svg:circle")
+              .attr("r", 3.5);
+         
+              // place the name atribute left or right depending if children
+              node.append("svg:text")
+                .attr("dx", function(d) { return d.children ? -8 : 8; })
+                .attr("dy", 3)
+                .style("font-weight", "bold")
+                .attr("text-anchor", function(d) { return d.children ? "end" : "start"; })
+                .text(function(d) { return d.name; })
+        }      
+
+        function serverInfoTemplate(servername){
             var html = '<div class="card serverInfo" id="'+ sanitizeServerName(servername) +'">';
             html += '<h5 class="card-header vmstore"> '+ servername +' ';
-            html += '<a href="" onclick="removeElement(this); return false;" id="'+ sanitizeServerName(servername) +'"';
-            html += 'class="removeDivCard float-right" title="Remove">'; 
+            //remove card
+            html += '<a href="" style="display:block; padding-left:10px;" '
+            html += 'onclick="removeElement(this); return false;" id="'+ sanitizeServerName(servername) +'"';
+            html += 'class="removeDivCard float-right" title="Remove">';
             html += '<i class="fa fa-times" aria-hidden="true" style="color:red"></i></a>'
+            //refresh
+            html += '<a href="" style="display:block; padding-left:10px"'
+            html += 'onclick="reloadItem(this); return false;" id="'+ sanitizeServerName(servername) +'"';
+            html += 'class="reloadDivCard float-right" title="Refresh">'; 
+            html += '<i class="fa fa-refresh" aria-hidden="true" id="'+ sanitizeServerName(servername) +'_refresh" style="color:red; "></i></a>';
+            //dropdown
+            html += '<select class="'+ sanitizeServerName(servername) +'_seconds float-right"><option value="10">10</option><option value="20">20</option>'
+            html += '<option value="30">30</option><option value="40">40</option></select>';  
+            html += '<label class="float-right" style="display:block; padding-right:10px">Seconds:</label>'        
+            //end
             html += '</h5>';
             html += '<div class="card-body text-center">';
             html += '<div class="card-group">';
@@ -506,7 +772,7 @@
             html += '<p class="card-text disksCount">';
             html += '<i class="fa fa-spinner fa-pulse " aria-hidden="true"></i></p>';
             html += '</div>';
-            html += '</div>            ';
+            html += '</div>';
             html += '<div class="card border text-white bg-success">';
             html += '<h5 class="card-header">';
             html += '<i class="fa fa-camera" aria-hidden="true"></i> ';
@@ -520,10 +786,10 @@
             html += '<div class="card border text-white bg-danger">';
             html += '<h5 class="card-header text-nowrap">';
             html += '<i class="fa fa-users" aria-hidden="true"></i> ';
-            html += 'Service Group';
+            html += 'FIPS Status';
             html += '</h5>';
             html += '<div class="card-body">';
-            html += '<p class="card-text servicegroup">';
+            html += '<p class="card-text isFipsEncryptionEnabled">';
             html += '<i class="fa fa-spinner fa-pulse " aria-hidden="true"></i></p>';
             html += '</div>';
             html += '</div>';
@@ -618,30 +884,10 @@
             html += '</table>';
             html += '</div>';
             html += '</div>';
-            //Service groups Start from here 
-            html += '<div class="card-group">';
-            html += '<div class="card border bg-warning">';
-            html += '<h5 class="card-header">';
-            html += '<i class="fa fa-desktop" aria-hidden="true"></i> ';
-            html += 'FIPS Status';
-            html += '</h5>';
-            html += '<div class="card-body ">';
-            html += '<p class="card-text isFipsEncryptionEnabled">';
-            html += '<i class="fa fa-spinner fa-pulse " aria-hidden="true"></i></p>';
-            html += '</div>';
-            html += '</div>';
-            html += '<div class="card border text-white bg-primary">';
-            html += '<h5 class="card-header"> ';
-            html += '<i class="fa fa-hdd-o" aria-hidden="true"></i> ';
-            html += 'Topology';
-            html += '</h5>';
-            html += '<div class="card-body">';
-            html += '<p class="card-text topology">';
-            html += '<i class="fa fa-spinner fa-pulse " aria-hidden="true"></i></p>';
-            html += '</div>';
-            html += '</div>';                    
+            // System Monitor Health status start here
+            html += '<div class="card-group">';                       
             html += '<div class="card border border-secondary">';
-            html += '<h5 class="card-header text-white bg-secondary ">Service Group</h5>';
+            html += '<h5 class="card-header bg-warning ">Service Group</h5>';
             html += '<table class="table table-bordered table-striped table-sm">';
             html += '<tbody>';
             html += '<tr>';
@@ -670,6 +916,125 @@
             html += '</tr>';
             html += '</tbody>';
             html += '</table>';
+            html += '</div>';
+            html += '<div class="card border border-secondary">';            
+            html += '<h5 class="card-header text-white bg-secondary">Monitor Health Status</h5>';
+            html += '<table class="table table-bordered table-striped table-sm">';
+            html += '<tbody>';
+            html += '<tr>';
+            html += '<td>Pair State</td>';
+            html += '<th class="Pair_State">';
+            html += '<i class="fa fa-spinner fa-pulse " aria-hidden="true"></i>';
+            html += '</th>';
+            html += '</tr>';
+            html += '<tr>';
+            html += '<td>Pair Errors</td>';
+            html += '<th class="Pair_Errors">';
+            html += '<i class="fa fa-medkit" aria-hidden="true"></i>';
+            html += '</th>';
+            html += '</tr>';
+            html += '<tr>';
+            html += '<td>Pair UpTime</td>';
+            html += '<th class="Pair_UpTime">';
+            html += '<i class="fa fa-spinner fa-pulse " aria-hidden="true"></i>';
+            html += '</th>';
+            html += '</tr>';
+            html += '<tr>';
+            html += '<td>Current Node</td>';
+            html += '<th class="Current_Node">';
+            html += '<i class="fa fa-spinner fa-pulse " aria-hidden="true"></i>';
+            html += '</th>';
+            html += '</tr>';
+            html += '</tbody>';
+            html += '</table>';
+            html += '</div>';
+            // html += '<div class="container"><h5 class="card-header">Monitor System Health</h5></div>';
+            html += '<div class="card border border-secondary">';
+            html += '<h5 class="card-header text-white bg-secondary ">Primary</h5>';
+            html += '<table class="table table-bordered table-striped table-sm">';
+            html += '<tbody>';
+            html += '<tr>';
+            html += '<td>Role</td>';
+            html += '<th class="primary_Node_Role">';
+            html += '<i class="fa fa-spinner fa-pulse " aria-hidden="true"></i>';
+            html += '</th>';
+            html += '</tr>';
+            html += '<tr>';
+            html += '<td>Status</td>';
+            html += '<th class="primary_Node_Status">';
+            html += '<i class="fa fa-spinner fa-pulse " aria-hidden="true"></i>';
+            html += '</th>';
+            html += '</tr>';
+            html += '<tr>';
+            html += '<td>Errors</td>';
+            html += '<th class="primary_Node_Errors">';
+            html += '<i class="fa fa-spinner fa-pulse " aria-hidden="true"></i>';
+            html += '</th>';
+            html += '</tr>';
+            html += '<tr>';
+            html += '<td>Mode</td>';
+            html += '<th class="primary_Process_Mode">';
+            html += '<i class="fa fa-spinner fa-pulse " aria-hidden="true"></i>';
+            html += '</th>';
+            html += '</tr>';
+            html += '</tbody>';
+            html += '</table>';
+            html += '</div>';
+            html += '<div class="card border border-secondary">';
+            html += '<h5 class="card-header text-white bg-secondary ">Secondary</h5>';
+            html += '<table class="table table-bordered table-striped table-sm">';
+            html += '<tbody>';
+            html += '<tr>';
+            html += '<td>Role</td>';
+            html += '<th class="secondary_Node_Role">';
+            html += '<i class="fa fa-spinner fa-pulse " aria-hidden="true"></i>';
+            html += '</th>';
+            html += '</tr>';
+            html += '<tr>';
+            html += '<td>Status</td>';
+            html += '<th class="secondary_Node_Status">';
+            html += '<i class="fa fa-spinner fa-pulse " aria-hidden="true"></i>';
+            html += '</th>';
+            html += '</tr>';
+            html += '<tr>';
+            html += '<td>Errors</td>';
+            html += '<th class="secondary_Node_Errors">';
+            html += '<i class="fa fa-spinner fa-pulse " aria-hidden="true"></i>';
+            html += '</th>';
+            html += '</tr>';
+            html += '<tr>';
+            html += '<td>Mode</td>';
+            html += '<th class="secondary_Process_Mode">';
+            html += '<i class="fa fa-spinner fa-pulse " aria-hidden="true"></i>';
+            html += '</th>';
+            html += '</tr>';
+            html += '</tbody>';
+            html += '</table>';
+            html += '</div>';
+            html += '</div>';
+            // end here
+            //Service groups Start from here 
+            html += '<div class="card-group">';            
+            html += '<div class="card border text-white bg-primary">';
+            html += '<h5 class="card-header"> ';
+            html += '<i class="fa fa-hdd-o" aria-hidden="true"></i> ';
+            html += 'Topology';
+            html += '</h5>';
+            html += '<div class="card-body">';
+            html += '<div id="'+sanitizeServerName(servername)+'_viz"></div>'
+            /*html += '<p class="card-text topology">';
+            html += '<i class="fa fa-spinner fa-pulse " aria-hidden="true"></i></p>';*/
+            html += '</div>';
+            html += '</div>';    
+            html += '<div class="card border text-white bg-primary">';
+            html += '<h5 class="card-header"> ';
+            html += '<i class="fa fa-minus-circle" aria-hidden="true"></i> ';
+            html += 'Cores/Crash';
+            html += '</h5>';
+            html += '<div class="card-body">';
+            html += '<div id="'+sanitizeServerName(servername)+'_cores" ';
+            html += 'style="height: 100px; overflow-y: scroll;"></div>'
+            html += '</div>';
             html += '</div>';
             html += '</div>';
             // Service groups end here           
@@ -785,7 +1150,54 @@
         }
 
         function removeElement(obj) {
-            $('#'+ obj.id).remove();            
+            $('#'+ obj.id).remove();
+            var servername = $(obj).attr('id');
+            try{
+                clearInterval(intervals[servername]);
+                $.each(reloadData, function(key,value){
+                    if (value.servername == servername) {
+                        reloadData.splice(key, 1);
+                        $('.'+value.servername+'_seconds').prop('disabled',false); 
+                    }               
+                });
+            } catch(err) {
+                console.log(err);
+            }  
+        }
+
+        var reloadData = [], intervals = {};
+        function reloadItem(argument) {
+            try {
+                var servername = $(argument).attr('id');              
+                var inArray = false;
+                $.each(reloadData, function(key, value) {  
+                    console.log('value',value);
+                    if (value.servername == servername) {
+                        inArray = true;
+                        return true;
+                    }
+                });
+
+                if (!inArray) {
+                    var seconds = $('.'+servername+'_seconds option:selected').val();
+                    $('.'+servername+'_seconds').prop('disabled',true);                 
+                    intervals[servername] = setInterval(reload, seconds*1000, servername);
+                    console.log('running seconds', seconds*1000);
+                    $(argument).find($("#"+servername+"_refresh")).removeClass('fa-refresh').addClass('fa-refresh fa-spin');
+                    reloadData.push({'servername':servername})
+                }
+                console.log(reloadData);                        
+            } catch(err) {
+                console.log(err);
+            }            
+        }
+
+        function reload(arg) {
+            console.log('argument', arg);
+            db.vmstores.get(arg, function(item){
+                    console.log(item);
+                    hitMeHard(item,'view');            
+            });
         }
         
         // DB
@@ -911,7 +1323,6 @@
             } else {
                 alert('Select the VMStore');
             }
-
         });
 
         $(document).on('click', '#saveServerDetails',function(e){
@@ -981,7 +1392,7 @@
             var servername = $(this).attr('data-servername');
             db.vmstores.get(servername, function(item){
                 console.log(item);
-                hitMeHard(item,'view');
+                hitMeHard(item,'view');            
             });
             // var documentHeight=document.documentElement.offsetHeight;
             // var viewportHeight=window.innerHeight;

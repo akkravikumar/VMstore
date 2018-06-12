@@ -12,7 +12,8 @@
         <link rel="stylesheet" href="./css/dataTables.checkboxes.css"/>
         <title>VMstore State Reporter</title>
         <script type="text/javascript" src="./d3.min.js"></script>
-        <script> let d3 = window.jQuery = require('./d3.min.js') </script>        
+        <script> let d3 = window.jQuery = require('./d3.min.js') </script> 
+              
         <style>
             .grid-container {
                 display: grid;
@@ -116,21 +117,83 @@
         <br/>
 
         <div class="alert" id="alertScrollMsg" role="alert"></div>
-
+        <!-- // -->
+        <div class="card" id="serverCustomize">
+            <h5 class="card-header">Customize Data
+                <a href="javascript:hideCustomElement()" id="hideServerCard" class="hideCustomizeDivCard float-right" title="Hide">
+                    <i class="fa fa-times" aria-hidden="true" style="color:red"></i>
+                </a>
+            </h5>
+            <form id="serverForm">
+                <div class="card-body">                       
+                        <div class="form-row">
+                            <div class="form-group col-md-2">
+                              <input type="checkbox" name="vmsCount" value="0"> VM Count</br>
+                            </div>
+                            <div class="form-group col-md-2">
+                              <input type="checkbox" name="diskCount" value="1"> Virtual Disk</br>
+                            </div>
+                            <div class="form-group col-md-2">
+                              <input type="checkbox" name="snapshot" value="2"> Snapshot</br>
+                            </div>
+                            <div class="form-group col-md-2">
+                              <input type="checkbox" name="fips" value="3"> FIPS</br>
+                            </div>
+                            <div class="form-group col-md-2">
+                              <input type="checkbox" name="physicalSpace" value="4"> Physcial Space</br>
+                            </div>
+                            <div class="form-group col-md-2">
+                              <input type="checkbox" name="iops" value="5"> IOPS</br>
+                            </div>
+                            <div class="form-group col-md-2">
+                              <input type="checkbox" name="throughput" value="6"> Throughput</br>
+                            </div>
+                            <div class="form-group col-md-2">
+                              <input type="checkbox" name="latency" value="7"> Latency</br>
+                            </div>
+                            <div class="form-group col-md-2">
+                              <input type="checkbox" name="spaceFactor" value="8"> Spacing Factor</br>
+                            </div>
+                            <div class="form-group col-md-2">
+                              <input type="checkbox" name="logicalSpace" value="9"> Logical Space</br>
+                            </div> 
+                            <div class="form-group col-md-2">
+                              <input type="checkbox" name="serviceGroup" value="10"> Service Group</br>
+                            </div> 
+                            <div class="form-group col-md-2">
+                              <input type="checkbox" name="monitor" value="11"> Monitor Health Status</br>
+                            </div> 
+                            <div class="form-group col-md-2">
+                              <input type="checkbox" name="topology" value="12"> Topology</br>
+                            </div>
+                            <div class="form-group col-md-2">
+                              <input type="checkbox" name="cores" value="13"> Cores</br>
+                            </div>
+                            <div class="form-group col-md-2">
+                              <input type="checkbox" name="schedule" value="14"> Schedules</br>
+                            </div>
+                            <div class="form-group col-md-2">
+                              <input type="checkbox" name="logs" value="15"> Logs</br>
+                            </div>
+                        </div>
+                </div>
+                <button id="CustomizedDataExport" class="btn btn-primary float-right" style="margin-right: 10px;margin-bottom: 10px">Export</button>
+            </form>
+        </div>
+        <!-- // -->
         <div class="card">
             <h5 class="card-header"> Server Info
                  <a href="javascript:downloadPdf()" class="serverFormDivBtn btn btn-primary float-right" title="Download PDF"><i class="fa fa-file-pdf-o" aria-hidden="true"></i></a>
                   <a href="javascript:downloadExcel()" class="ExportBtn btn btn-primary float-right" title="Download Excel"><i class="fa fa-file-excel-o" aria-hidden="true"></i></a>
-             </h5>
+             </h5>             
              <div id="severtInfoList" class="card-body"></div>
        </div>
     </div>
 
     <div id="editor"></div>
-
     <script type="text/javascript">
         const Dexie = require('dexie');
-        var $ = require("jquery");
+        var $ = require("jquery");      
         var html2canvas = require('html2canvas');
         var dt = require( 'datatables.net' )();
         require('pdfmake/build/pdfmake.js');
@@ -141,8 +204,12 @@
     <script src="./js/dataTables.checkboxes.min.js"></script>
     <script src="d3.min.js"></script>    
     <script>
+        var topologyData =  {};          
         function hideElement() {
-            $("#serverFormDiv").hide();
+            $("#serverFormDiv").hide();            
+        }
+        function hideCustomElement() {
+            $('#serverCustomize').hide();
         }
         var SSH = require('simple-ssh');
         var request = require('request').defaults({strictSSL: false});
@@ -324,7 +391,7 @@
                     }
                 ]
             }
-        ]
+        ]        
 
         function buildRequestOptions(skeleton, servername, headers = {}, body={}){
             var _headers = {
@@ -378,7 +445,7 @@
             },
             command = '/usr/tintri/bin/hamoncmd';
             exec(config, command, function (error, response) {
-                if (error) {
+                if (error) {                    
                     throw error;
                 }
 
@@ -461,6 +528,32 @@
                         name : 'Current_Node'
                     }
                 ]
+                var monitorJsonSkeleton = [
+                    {
+                        "monitor_data": "primary_Node_Role"
+                    },
+                    {
+                        "monitor_data": "primary_Node_Status"
+                    },
+                    {                    
+                        "monitor_data": "primary_Node_Errors"
+                    },
+                    {
+                        "monitor_data": "primary_Process_Mode"
+                    },
+                    {
+                        "monitor_data": "secondary_Node_Role"
+                    },
+                    {
+                        "monitor_data": "secondary_Node_Status"
+                    },
+                    {
+                        "monitor_data": "secondary_Node_Errors"
+                    },
+                    {
+                        "monitor_data": "secondary_Process_Mode"
+                    }
+                ]
                 jsonSkeleton.forEach(function(jsonKey){    
                     var result = myObject[jsonKey.name];
                     if(!result){
@@ -470,6 +563,7 @@
                 });
 
                 var nodeLength = 0;
+                console.log('myobjectnode==',myObject)
                 myObject.node.forEach(function(value){
                     value.forEach(function(argument){
                         var result = Object.values(argument)[0];
@@ -498,14 +592,190 @@
                             setServerValues(item['servername'],'secondary_'+theKey,result);
                         }                       
                     }*/
-                });                            
+                });   
+                if (myObject.node.length == 0) {
+                    var result = '<i class="fa fa-lg fa-times-circle" aria-hidden="true"></i>';                        
+                    monitorJsonSkeleton.forEach(function(value) {
+                        setServerValues(item['servername'],value['monitor_data'],result);
+                    });
+                }                         
             });            
         }
 
-        function fetchCoresCrashes(item) {
+        /*function collect(item, cmd) {
+            var exec = require('node-ssh-exec');
             var servername = item['servername'];     
             var username = 'root';     
             var password =item['password'];
+            console.log('use',servername,username,password);
+            var SFTPS = require('sftps');
+            var sftp = new SFTPS({
+              host: servername, // required
+              username: username, // required
+              password: password // required
+            });
+            sftp.raw('/usr/tintri/bin/hamoncmd -N');
+            sftp.exec(function (err, res) {
+                console.log('resting ===',res);
+            });
+        }*/
+
+        function collectLogsVMstore(item) {
+            var servername = item['servername'];     
+            var username = 'root';     
+            var password =item['password'];
+
+            var Client = require('ssh2-sftp-client');
+            var sftp = new Client();
+            var controllerList = [{
+                    node:'A',
+                    tag: '_primaryLogs',
+                    color:'#000000'
+                },
+                {
+                    node:'B',
+                    tag:'_secondaryLogs',
+                    color:'#FFFFFF'
+                }];
+            controllerList.forEach(function(controller){                
+                sftp.connect({
+                    host: servername+controller['node'],
+                    username: username,
+                    password: password
+                }).then(() => {
+                    return sftp.list('/var/log/tintri');
+                }).then((data) => {
+                    var content = null;
+                    data.forEach(function(fileData) {
+                        content += '<tr><td align="left"><a href="" onclick="downloadLogItem(this); return false;" controller="'+controller['node']+'" data="'+fileData.name+'" id="'+ servername +'" style="color:'+controller['color']+';text-decoration: underline;">'+ new Date().toLocaleString(fileData.modifyTime) + ' '+ fileData.name +'</a></td></tr>'
+                    });
+                    // if (controller =='A') {
+                    $('#'+sanitizeServerName(item['servername']) +controller['tag']).html(content);
+                    // } else  {
+                        // $('#'+sanitizeServerName(item['servername']) +'_secondaryLogs').html(content);
+                    // }
+                }).catch((err) => {
+                    console.log(err, 'catch error');
+                });
+            });
+            /*sftp.connect({
+                host: servername,
+                username: username,
+                password: password
+            }).then(() => {
+                return sftp.list('/var/log/tintri');
+            }).then((data) => {
+                var content = null;
+                data.forEach(function(fileData) {
+                    content += '<tr><td align="left"><a href="" onclick="downloadLogItem(this); return false;" obj="'+sftp+'" data="'+fileData.name+'" id="'+ servername +'">'+ new Date().toLocaleString(fileData.modifyTime) + ' '+ fileData.name +'</a></td><tr>'
+                });
+                $('#'+sanitizeServerName(item['servername']) +'_primaryLogs').html(content);
+            }).catch((err) => {
+                console.log(err, 'catch error');
+            });*/
+        }
+
+        function downloadLogItem(obj) {
+            try{
+                var servername = $(obj).attr('id');
+                var fileName = $(obj).attr('data');
+                var controller = $(obj).attr('controller');
+                $('#'+sanitizeServerName(servername) +'_logs_downloading').show();  
+                db.vmstores.get(servername, function(item){
+                    downloadSCPData(item,fileName, 'log', controller);
+                    /*try{
+                        var client = require('scp2');
+                        var fs = require('fs');
+                        var dir = './log';
+                        if (!fs.existsSync(dir)){
+                            fs.mkdirSync(dir);
+                        }
+
+                        client.scp({
+                            host: item['servername'],
+                            username: 'root',
+                            password: item['password'],
+                            path: '/var/log/tintri/'+fileName
+                        }, process.cwd()+'/log/', function(err) {
+                            if(err){
+                              console.log('There has been some error!!!');
+                              console.log(err);
+                            } else {
+                                alert('File has downloaded successfully in the path of '+process.cwd()+'/log');
+                                console.log('succeeded downloaded the file to remote server', process.cwd());   
+                           }
+                        })
+                    } catch(err) {
+                        console.log(err);
+                    }*/
+                });
+            } catch(err) {
+                console.log(err);
+            }
+        }
+
+        function downloadCoresItem(obj) {
+            var servername = $(obj).attr('id');
+            var fileName = $(obj).attr('data');
+            $('#'+sanitizeServerName(servername) +'_cores_downloading').show();
+            db.vmstores.get(servername, function(item){
+                downloadSCPData(item,fileName, 'cores',null);                
+            });
+        }
+
+        function downloadSCPData(item, fileName,type, controller) {
+            var pathType = '', typeFolder='';
+            var servername = item['servername'];
+            var fs = require('fs');                
+            if (type =='cores') {
+                var dir = './cores';
+                if (!fs.existsSync(dir)){
+                    fs.mkdirSync(dir);
+                } 
+                typeFolder = '/cores/';
+                pathType = '/var/corefiles/'+fileName;
+            } else {
+                var dir = './log';
+                if (!fs.existsSync(dir)){
+                    fs.mkdirSync(dir);
+                }
+                typeFolder = '/log/';
+                pathType = '/var/log/tintri/'+fileName;
+                servername = servername+controller;
+                console.log('controller=',controller);
+            }
+            
+            var client = require('scp2');
+            try{                         
+                console.log(servername);       
+                client.scp({
+                    host: servername,
+                    username: 'root',
+                    password: item['password'],
+                    path: pathType
+                }, process.cwd() + typeFolder, function(err) {
+                    if(err){
+                      console.log('There has been some error!!!');
+                      console.log(err);
+                    } else {
+                        alert('File has downloaded successfully in the path of '+process.cwd()+typeFolder);
+                    }
+                    $('#'+sanitizeServerName(item['servername']) +'_cores_downloading').hide();
+                    $('#'+sanitizeServerName(item['servername']) +'_logs_downloading').hide();
+                    client.close();
+                })
+            } catch(err) {
+                console.log(err);
+                client.end();
+            }
+        }
+
+        function fetchCoresCrashes(item, days) {
+            var servername = item['servername'];     
+            var username = 'root';
+            var password =item['password'];
+            $('#'+sanitizeServerName(item['servername']) +'_cores').hide();
+            $('#'+sanitizeServerName(item['servername']) +'_cores_spin').show();
 
             var Client = require('ssh2-sftp-client');
             var sftp = new Client();
@@ -516,32 +786,35 @@
             }).then(() => {
                 return sftp.list('/var/corefiles');
             }).then((data) => {
+                $('#'+sanitizeServerName(item['servername']) +'_cores').show();
+                $('#'+sanitizeServerName(item['servername']) +'_cores_spin').hide();
                 var d = new Date();
-                d.setDate(d.getDate() - 10)
-                var content = '<table>';
+                d.setDate(d.getDate() - days);
+                var content = '';
                 var isFile = [];
                 data.forEach(function(fileData){
                     if (fileData.name.includes('sqsh.gz') || fileData.name.includes('gz')) {
                         var fileModifyDate = new Date(fileData.modifyTime);
                         var validCore = fileModifyDate.getTime() >= d.getTime();
-                        if (validCore) {
+                        // if (validCore) {
                             isFile.push(fileData.name);
-                            var dateFormatter = new Date(fileData.modifyTime);
-                            content += '<tr><td>'+ dateFormatter.toLocaleDateString() +' </td><td align="left">'+ fileData.name +'</td></tr>';
-                        } else {
-                            // console.log('The cores are expired',fileData.name);
-                        }
-                    } else {
-                        // console.log('no file',fileData);
+                            content += '<tr><td align="left"><a href="" onclick="downloadCoresItem(this); return false;" data="'+fileData.name+'" id="'+ item['servername'] +'" style="color:#FFFFFF;text-decoration: underline;">'+ fileData.name +'</a></td></tr>';
+                        // }
                     }
                 });
                 if (isFile.length == 0) {
                     content = '<tr><td>No cores files available</td></tr>';
                 }
-                content+='</table>';
-                $('#'+sanitizeServerName(item['servername']) +'_cores').html(content);                
+                // content+='</table>';
+                $('#'+sanitizeServerName(item['servername']) +'_coresTable').html(content);
+                sftp.end();
             }).catch((err) => {
                 console.log(err, 'catch error');
+                var errContent = '<table><tr><td>No cores files available</td></tr></table>';
+                $('#'+sanitizeServerName(item['servername']) +'_cores').html(errContent);
+                $('#'+sanitizeServerName(item['servername']) +'_cores_spin').hide();
+                $('#'+sanitizeServerName(item['servername']) +'_cores').show();
+                sftp.end();
             });
         }
 
@@ -577,8 +850,11 @@
                 // Monitor Health status
                 fetchMonitorData(item);
 
+                collectLogsVMstore(item);
+
                 // Cores/crashes files
-                fetchCoresCrashes(item);
+                var days = $('.'+servername+'_days option:selected').val();
+                fetchCoresCrashes(item, days);                
 
                 apiSkeleton.forEach(function(skeleton){
 
@@ -594,10 +870,9 @@
                             if(!result){
                                 result = '<i class="fa fa-lg fa-times-circle" aria-hidden="true"></i>';
                             }
-                            console.log( item['unique'],fetchData(body,item));
-                                                    
-                            if (Array.isArray(result)) {
-                                if (item['unique'] == 'topology') {
+                            console.log( item['unique'],fetchData(body,item));                                    
+                            if (item['unique'] == 'topology') {
+                                if (Array.isArray(result)) {
                                     var topologyObj = {
                                     };
                                     var children = [];
@@ -606,8 +881,14 @@
                                         children.push({'name':result[i].displayName}); 
                                     }
                                     topologyObj.children = children;
+                                    topologyData[servername] = children;
                                     makeTopologyDiagram(topologyObj);
-                                }                                
+                                } else {
+                                    topologyData[servername] = [];
+                                    console.log('topology not available');
+                                    $("#"+sanitizeServerName(servername)+"_viz").html("No topology available");
+                                } 
+                                console.log('topoDta',topologyData);                             
                             }
                             setServerValues(servername,item['unique'],result);                           
                             // Service Groups
@@ -615,9 +896,56 @@
                                 setServerValues(servername,'syncCount','0');
                                 setServerValues(servername,'asyncCount','0');
                                 setServerValues(servername,'cloudCount','0');
-                                setServerValues(servername,'quotaCount','0');                    
-                                var syncCount = 0, quotaCount = 0, clouldCount = 0, asyncCount = 0;
-                                result.forEach(function(resultItem) {
+                                setServerValues(servername,'quotaCount','0');
+                                setServerValues(servername,'qosCount','0');
+                                var syncCount = 0, quotaCount = 0, clouldCount = 0, asyncCount = 0, qosCount =0;
+                                var serviceName = [
+                                    schedules:[]
+                                ], schedules = [];
+                                $('#'+servername+'_schedules').html(''); 
+                                console.log('started');
+                                result.forEach(function(resultItem, i) {
+                                    if (resultItem.hasOwnProperty('protectionPolicy')) {
+                                        serviceName['name'] = resultItem['name'];
+                                        var protection = resultItem['protectionPolicy'];
+                                        schedules = [];
+                                        // var data = '<tr><td>'+resultItem['name']+'</td><td>-</td><td>-</td><td>-</td><td>-</td></tr>';
+                                        $.each(protection['snapshotSchedules'], function(key,value){
+                                            var retainLocal = value['retentionSourceMinutes'];
+                                            var data = '<tr><td>'+resultItem['name']+'</td><td>'+value['name']+'</td>';
+                                            if (retainLocal > 0) {
+                                                if (value['type'] == 'HOURLY') {
+                                                    data += '<td>'+retainLocal/60+' Hours</td>'
+                                                } else if(value['type'] == 'DAILY') {
+                                                    data+='<td>'+(retainLocal/60)/24+' Days</td>'
+                                                }
+                                                data += '<td>'+value['consistency']+'</td></tr>'
+                                                $('#'+servername+'_schedules').append(data); 
+                                            } else {
+                                                /*var datas = '<tr><td>'+resultItem['name']+'</td><td>'+value['name']+'</td><td>-</td><td>-</td><td>-</td></tr>';
+                                                $('#'+servername+'_schedules').append(datas); */
+                                            }
+                                        });
+                                        /*schedules['name'] = resultItem['name']
+                                        $.each(protection['snapshotSchedules'], function(key,value){
+                                            var retainLocal = value['retentionSourceMinutes'];
+                                            if (retainLocal > 0) {
+                                                data += '<td>'+value['name']+'</td><td>Everyday</td>';
+                                                if (value['type'] == 'HOURLY') {
+                                                    data+='<td>'+retainLocal/60+' Hours</td>'
+                                                } else if(value['type'] == 'DAILY') {
+                                                    data+='<td>'+(retainLocal/60)/24+' Days</td>'
+                                                }
+                                                data += '<td>'+value['consistency']+'</td></tr>'
+                                            }*//* else {
+                                                data += '<td>-</td>';
+                                            }*/
+                                            // schedules.push({'type':value['type']});                                            
+                                        // });
+                                        // console.log('data=',data);
+                                        // $('#'+servername+'_schedules').append(data);                                
+                                    }
+
                                     if(resultItem.hasOwnProperty('syncReplPolicy')){
                                         syncCount = syncCount + 1;
                                         setServerValues(servername,'syncCount',syncCount);
@@ -625,11 +953,22 @@
                                         quotaCount = quotaCount + 1;
                                         setServerValues(servername,'quotaCount',quotaCount);
                                     } else {
+                                        if (resultItem.hasOwnProperty('qosConfig')) {
+                                            var qosConfig = resultItem['qosConfig'];
+                                            if (qosConfig['minNormalizedIops'] > 0) {
+                                                console.log('qosconfig', 'configs');
+                                                qosCount = qosCount+1;
+                                                setServerValues(servername,'qosCount',qosCount);
+                                            } else {
+                                                console.log('not qosconfig', 'configs');
+                                            }
+                                        }
                                         var members = resultItem.members; 
                                         if (members.length == 0) {
                                             setServerValues(servername,'cloudCount','Invalid');
                                             setServerValues(servername,'asyncCount','Invalid'); 
                                         }
+
                                         for (var i = 0; i < members.length; i++) {
                                             // start
                                             apiSGSkeleton.forEach(function(sgSkeleton){
@@ -914,6 +1253,12 @@
             html += '<i class="fa fa-spinner fa-pulse " aria-hidden="true"></i>';
             html += '</th>';
             html += '</tr>';
+            html += '<tr>';
+            html += '<td>Qos</td>';
+            html += '<th class="qosCount">';
+            html += '<i class="fa fa-spinner fa-pulse " aria-hidden="true"></i>';
+            html += '</th>';
+            html += '</tr>';
             html += '</tbody>';
             html += '</table>';
             html += '</div>';
@@ -922,25 +1267,25 @@
             html += '<table class="table table-bordered table-striped table-sm">';
             html += '<tbody>';
             html += '<tr>';
-            html += '<td>Pair State</td>';
+            html += '<td class="text-left">Pair State</td>';
             html += '<th class="Pair_State">';
             html += '<i class="fa fa-spinner fa-pulse " aria-hidden="true"></i>';
             html += '</th>';
             html += '</tr>';
             html += '<tr>';
-            html += '<td>Pair Errors</td>';
+            html += '<td class="text-left">Pair Errors</td>';
             html += '<th class="Pair_Errors">';
-            html += '<i class="fa fa-medkit" aria-hidden="true"></i>';
+            html += '<i class="fa fa-spinner fa-pulse" aria-hidden="true"></i>';
             html += '</th>';
             html += '</tr>';
             html += '<tr>';
-            html += '<td>Pair UpTime</td>';
+            html += '<td class="text-left">Pair UpTime</td>';
             html += '<th class="Pair_UpTime">';
             html += '<i class="fa fa-spinner fa-pulse " aria-hidden="true"></i>';
             html += '</th>';
             html += '</tr>';
             html += '<tr>';
-            html += '<td>Current Node</td>';
+            html += '<td class="text-left">Current Node</td>';
             html += '<th class="Current_Node">';
             html += '<i class="fa fa-spinner fa-pulse " aria-hidden="true"></i>';
             html += '</th>';
@@ -954,25 +1299,25 @@
             html += '<table class="table table-bordered table-striped table-sm">';
             html += '<tbody>';
             html += '<tr>';
-            html += '<td>Role</td>';
+            html += '<td class="text-left">Role</td>';
             html += '<th class="primary_Node_Role">';
             html += '<i class="fa fa-spinner fa-pulse " aria-hidden="true"></i>';
             html += '</th>';
             html += '</tr>';
             html += '<tr>';
-            html += '<td>Status</td>';
+            html += '<td class="text-left">Status</td>';
             html += '<th class="primary_Node_Status">';
             html += '<i class="fa fa-spinner fa-pulse " aria-hidden="true"></i>';
             html += '</th>';
             html += '</tr>';
             html += '<tr>';
-            html += '<td>Errors</td>';
+            html += '<td class="text-left">Errors</td>';
             html += '<th class="primary_Node_Errors">';
             html += '<i class="fa fa-spinner fa-pulse " aria-hidden="true"></i>';
             html += '</th>';
             html += '</tr>';
             html += '<tr>';
-            html += '<td>Mode</td>';
+            html += '<td class="text-left">Mode</td>';
             html += '<th class="primary_Process_Mode">';
             html += '<i class="fa fa-spinner fa-pulse " aria-hidden="true"></i>';
             html += '</th>';
@@ -985,25 +1330,25 @@
             html += '<table class="table table-bordered table-striped table-sm">';
             html += '<tbody>';
             html += '<tr>';
-            html += '<td>Role</td>';
+            html += '<td class="text-left">Role</td>';
             html += '<th class="secondary_Node_Role">';
             html += '<i class="fa fa-spinner fa-pulse " aria-hidden="true"></i>';
             html += '</th>';
             html += '</tr>';
             html += '<tr>';
-            html += '<td>Status</td>';
+            html += '<td class="text-left">Status</td>';
             html += '<th class="secondary_Node_Status">';
             html += '<i class="fa fa-spinner fa-pulse " aria-hidden="true"></i>';
             html += '</th>';
             html += '</tr>';
             html += '<tr>';
-            html += '<td>Errors</td>';
+            html += '<td class="text-left">Errors</td>';
             html += '<th class="secondary_Node_Errors">';
             html += '<i class="fa fa-spinner fa-pulse " aria-hidden="true"></i>';
             html += '</th>';
             html += '</tr>';
             html += '<tr>';
-            html += '<td>Mode</td>';
+            html += '<td class="text-left">Mode</td>';
             html += '<th class="secondary_Process_Mode">';
             html += '<i class="fa fa-spinner fa-pulse " aria-hidden="true"></i>';
             html += '</th>';
@@ -1015,7 +1360,7 @@
             // end here
             //Service groups Start from here 
             html += '<div class="card-group">';            
-            html += '<div class="card border text-white bg-primary">';
+            html += '<div class="card border text-white bg-success">';
             html += '<h5 class="card-header"> ';
             html += '<i class="fa fa-hdd-o" aria-hidden="true"></i> ';
             html += 'Topology';
@@ -1026,18 +1371,77 @@
             html += '<i class="fa fa-spinner fa-pulse " aria-hidden="true"></i></p>';*/
             html += '</div>';
             html += '</div>';    
-            html += '<div class="card border text-white bg-primary">';
+            html += '<div class="card border text-white bg-danger">';
             html += '<h5 class="card-header"> ';
             html += '<i class="fa fa-minus-circle" aria-hidden="true"></i> ';
             html += 'Cores/Crash';
+
+            html += '<a style="display:none; padding-left:10px;"'
+            html += 'id="'+ sanitizeServerName(servername) +'_cores_downloading"';
+            html += 'class="float-right" title="Downloading">';
+            html += '<i class="fa fa-circle-o-notch fa-spin" style="color:white;" aria-hidden="true"></i></a>'
+
             html += '</h5>';
-            html += '<div class="card-body">';
-            html += '<div id="'+sanitizeServerName(servername)+'_cores" ';
-            html += 'style="height: 100px; overflow-y: scroll;"></div>'
+            html += '<div class="card-body"><div class="card-title">';
+            html += '<a href="" style="display:block; padding-left:10px"'
+            html += 'onclick="updateCoresFiles(this); return false;" id="'+ sanitizeServerName(servername) +'"';
+            html += 'class="reloadDivCard float-right" title="Cores/Crashes">'; 
+            html += '<i class="fa fa-chevron-circle-right" aria-hidden="true" id="'+ sanitizeServerName(servername) +'_refresh" style="color:white; "></i></a>';
+            html += '<select class="'+ sanitizeServerName(servername) +'_days float-right">'
+            html += '<option value="2">2</option><option value="4">4</option>'
+            html += '<option value="6">6</option><option value="8">8</option><option value="10">10</option></select>';
+            html += '<label class="float-right" style="display:block; padding-right:10px">Days:</label></div></br>';
+            html += '<div id="'+sanitizeServerName(servername)+'_cores_spin" style="display:block;">Please wait <i class="fa fa-circle-o-notch fa-spin" style="font-size:24px"></i></div>';
+            html += '<div id="'+sanitizeServerName(servername)+'_cores"';            
+            html += 'style="height: 100px; overflow: auto; display:none;">'
+            html += '<table class="table table-bordered table-sm">'
+            html += '<tbody id="'+sanitizeServerName(servername)+'_coresTable"></tbody></table>' 
+            html += '</div>'
             html += '</div>';
             html += '</div>';
             html += '</div>';
             // Service groups end here           
+            // Schedules
+            html += '<div class="card-group">';            
+            html += '<div class="card border">';
+            html += '<h5 class="card-header text-white bg-secondary"> ';
+            html += '<i class="fa fa-hdd-o" aria-hidden="true"></i> ';
+            html += 'SnapShot Schedules';
+            html += '</h5>';
+            html += '<div class="card-body" style="height: 200px; overflow: auto;">';
+            html += '<table class="table table-bordered table-sm"><thead><tr><th>Name</th><th>Schedule Type</th>'
+            html += '<th>Retain Local</th><th>Consistency</th></tr></thead>'
+            html += '<tbody id="'+sanitizeServerName(servername)+'_schedules"></tbody></table>'            
+            html += '</div>';
+            html += '</div></div>';
+
+            //Log files
+            html += '<div class="card-group">';                       
+            html += '<div class="card border bg-warning">';
+            html += '<h5 class="card-header bg-warning ">Primary Log'
+
+            html += '<a style="display:none; padding-left:10px;"'
+            html += 'id="'+ sanitizeServerName(servername) +'_logs_downloading"';
+            html += 'class="float-right" title="Downloading">';
+            html += '<i class="fa fa-circle-o-notch fa-spin" aria-hidden="true"></i></a>'
+
+            html += '</h5>';
+            html += '<div class="card-body" style="height: 200px; overflow: auto;">';
+            html += '<table class="table table-bordered table-striped table-sm">';
+            html += '<tbody id="'+sanitizeServerName(servername)+'_primaryLogs">';
+            html += '</tbody>';          
+            html += '</table>';
+            html += '</div></div>';
+           
+            html += '<div class="card border border-secondary  bg-primary">';
+            html += '<h5 class="card-header  text-white bg-primary">Secondary Log</h5>';
+            html += '<div class="card-body" style="height: 200px; overflow: auto;">';
+            html += '<table>';
+            html += '<tbody id="'+sanitizeServerName(servername)+'_secondaryLogs">';
+            html += '</tbody>';
+            html += '</table>';
+            html += '</div></div>';
+            html += '</div>';
             html += '<br/>';
             html += '</div> ';
             html += '</div> ';
@@ -1097,40 +1501,214 @@
         }
 
         function downloadExcel() {
-            var excelData = loadExcelData();
+            var testimonials = document.querySelectorAll('.serverInfo');
+            if (testimonials.length == 0) {
+                alert('Please select the VMstore');
+                return;
+            }
+            $('#serverCustomize').show();
+           /* var excelData = loadExcelData();
             setTimeout(function(){},2000); 
             console.log('lll',excelData)
             if (excelData.length == 0) {
                 alert('Please select VMstore machine');
                 return;
             }
-            // console.log(excelData)
             var csv = 'ServerName, VMCount, Virtual Disck, Snapshot, Service Group, Physcial Total Space, Physical Space Used, Physcial Free Space, IOPS, Throughput, Latency, Spacing Factor, Logical Total Space, Logical Used Space, Logical Free Space\n';
+            console.log('exceldata',excelData);
             excelData.forEach(function(row) {
                 csv += row.join(',');
                 csv += "\n";
             });
+            console.log('csv', csv);
 
             console.log(csv);
             var hiddenElement = document.createElement('a');
             hiddenElement.href = 'data:text/csv;charset=utf-8,' + encodeURI(csv);
             hiddenElement.target = '_blank';
             hiddenElement.download = 'VMstoreReporter.csv';
-            hiddenElement.click();
+            hiddenElement.click();*/
                
         }
+
+        $(document).on('click','#CustomizedDataExport',function(e){
+            var ObjIdList = ['vmsCount','diskCount','snapshot','fips','physicalSpace','iops','throughput','latency','spaceFactor','logicalSpace','serviceGroup','monitor','topology','cores','schedule','logs'];
+
+            var objData = [{dataAttr : '.vmsCount'},{dataAttr : '.disksCount'},{dataAttr : '.snapshot'},{dataAttr : '.isFipsEncryptionEnabled'},{dataAttr : ['.spaceTotalGiB','.spaceUsedPhysicalGiB','.spaceRemainingPhysicalGiB']},{dataAttr : '.operationsTotalIops'},{dataAttr : '.throughputTotalMBps'},{dataAttr : '.latencyStorageMs'},{dataAttr : '.spaceSavingsFactor'},{dataAttr : ['.logicalSpaceTotalGiB','.logicalUniqueSpaceUsedGiB','.spaceRemainingLogicalGiB']},{dataAttr : ['.syncCount','.asyncCount','.cloudCount','.quotaCount','.qosCount']},{dataAttr : ['.Pair_State','.Pair_Errors','.Pair_UpTime','.Current_Node','.primary_Node_Role','.primary_Node_Status','.primary_Node_Errors','.primary_Process_Mode','.secondary_Node_Role','.secondary_Node_Status','.secondary_Node_Errors','.secondary_Process_Mode']},{dataAttr : 'topology'},{dataAttr : '_coresTable'},{dataAttr : '_schedules'},{dataAttr : ['_primaryLogs','_secondaryLogs']}]        
+            var selectedList = [];
+            ObjIdList.forEach(function(data){
+               if($('input[name="'+data+'"]').is(':checked')) {                
+                    selectedList.push($('input[name="'+data+'"]:checked').val());              
+               }
+            });
+            console.log(selectedList);  
+            // if (selectedList.length ==0) {
+            //     alert('Please do check anything and export');
+            //     return;
+            // }
+            var excelHeaderData = [];
+            var excelValueData = [];
+            var excelData = [];
+            var isHeader = false;
+            var testimonials = document.querySelectorAll('.serverInfo');
+            if (selectedList.length ==0 || testimonials.length ==0) {
+                alert('Please do check anything and export');
+                return;
+            }
+            testimonials.forEach(function(item,value){                
+                var serverId = $(item).attr("id");
+                console.log('serverId',serverId);
+                if (!isHeader) {
+                    excelHeaderData.push('Servername');
+                }
+                excelValueData = [];
+                excelValueData.push(serverId);
+                selectedList.forEach(function(index){                    
+                    if (Array.isArray(objData[index]['dataAttr'])) {                        
+                        objData[index]['dataAttr'].forEach(function(data){
+                            if (index == 15) {
+                                if (!isHeader) {
+                                    excelHeaderData.push('Primary Log');
+                                    excelHeaderData.push('Secondary Log');
+                                }
+                                var tableData = '';
+                                var table = $('#'+serverId+data);
+                                table.find('tr').each(function (i) {
+                                    var $tds = $(this).find('td'),
+                                    logs = $tds.eq(0).text();
+                                    tableData = tableData + logs +  '^';
+                                });
+                                excelValueData.push(tableData);
+                                console.log(data, tableData);
+                            } else {
+                                if (!isHeader) {
+                                    excelHeaderData.push(data);
+                                }
+                                excelValueData.push($('#'+serverId).find(data).text());
+                                console.log($('#'+serverId).find(data).text());
+                            }
+                        });
+                    } else {
+                        console.log('index',index);
+                        if (index == 12) {
+                            if (!isHeader) {
+                                excelHeaderData.push('Topology');
+                            }
+                            var replicationName = '';
+                            topologyData[serverId].forEach(function(data, i){
+                                replicationName += data['name'];
+                                if (topologyData[serverId].length > i +1) {
+                                    replicationName += '^'
+                                }
+                            });
+                            excelValueData.push(replicationName);
+                            console.log('topology',topologyData[serverId]);
+                        } else if(index == 13) {
+                            var tableData = '';
+                            if (!isHeader) {
+                                excelHeaderData.push('Cores');
+                            }
+                            var table = $('#'+serverId+objData[index]['dataAttr']);
+                            console.log('id','#'+serverId+objData[index]['dataAttr']);                            
+                            table.find('tr').each(function (i) {
+                                var $tds = $(this).find('td'),
+                                coreData = $tds.eq(0).text();
+                                tableData += coreData + '^';                            
+                            });
+                            excelValueData.push(tableData);
+                        } else if (index == 14) {
+                            if (!isHeader) {                            
+                                excelHeaderData.push('Snapshot name');
+                                excelHeaderData.push('type');
+                                excelHeaderData.push('RetainLocal');
+                                excelHeaderData.push('Consistency');                            
+                            }
+
+                            var table = $('#'+serverId + objData[index]['dataAttr']);
+                            var sname = '',stype='', slocal='',sConsistency=''
+                            table.find('tr').each(function (i) {
+                                 var $tds = $(this).find('td'),
+                                    name = $tds.eq(0).text(),
+                                    type = $tds.eq(1).text(),
+                                    rLocal = $tds.eq(2).text(),
+                                    consistency = $tds.eq(3).text();
+                                sname = sname + name +'^'
+                                stype = stype + type +'^'
+                                slocal = slocal + rLocal +'^'
+                                sConsistency = sConsistency + consistency +'^'                                
+                                console.log('schedules: ' + name,type,rLocal, consistency);
+                            });
+                            excelValueData.push(sname);
+                            excelValueData.push(stype);
+                            excelValueData.push(slocal);
+                            excelValueData.push(sConsistency);
+                        } else {
+                            var jsonObj = objData[index]['dataAttr'];                            
+                            if (jsonObj.charAt(0) == '.') {
+                                jsonObj.substring(1);
+                            }
+                            if (!isHeader) {
+                                excelHeaderData.push(jsonObj);
+                            }
+                            excelValueData.push($('#'+serverId).find(objData[index]['dataAttr']).text());
+                            // console.log($('#'+serverId).find(objData[index]['dataAttr']).text());
+                        }
+                    }
+                });
+                excelData.push(excelValueData);                
+                if (!isHeader) {
+                    isHeader = true;
+                }               
+                if (testimonials.length == value +1) {
+                    console.log('final ',excelHeaderData, excelValueData);
+                    isHeader = false;
+                    var headers = excelHeaderData.join(',');
+                    headers = headers +'\n';
+                    console.log('excelData',excelData);
+                    excelData.forEach(function(row) {
+                        headers += row.join(',');
+                        headers += "\n";
+                    });
+                    console.log('headers', headers);
+
+                    console.log(headers);
+                    var hiddenElement = document.createElement('a');
+                    hiddenElement.href = 'data:text/csv;charset=utf-8,' + encodeURI(headers);
+                    hiddenElement.target = '_blank';
+                    hiddenElement.download = 'VMstoreReporter.csv';
+                    hiddenElement.click();
+                    $('#serverCustomize').hide();
+                }
+            });               
+        });
 
         function loadExcelData() {
             var data = [];
             var excelData = [];
             var testimonials = document.querySelectorAll('.serverInfo');
             testimonials.forEach(function(item,value){
-                serverId = $(item).attr("id");
+                var serverId = $(item).attr("id");
+                console.log('serverId',serverId);
                 data.push(serverId);
+
+                var selectedIndex = ['0','1','2','3','4','5'];
+                var objData = [{dataAttr : '.vmsCount'},{dataAttr : '.disksCount'},{dataAttr : '.snapshot'},{dataAttr : '.isFipsEncryptionEnabled'},{dataAttr : ['.spaceTotalGiB','.spaceUsedPhysicalGiB','.spaceRemainingPhysicalGiB']},{dataAttr : '.operationsTotalIops'},{dataAttr : '.throughputTotalMBps'},{dataAttr : '.latencyStorageMs'},{dataAttr : '.spaceSavingsFactor'},{dataAttr : ['.logicalSpaceTotalGiB','.logicalUniqueSpaceUsedGiB','.spaceRemainingLogicalGiB']},{dataAttr : ['.syncCount','.asyncCount','.cloudCount','.quotaCount','.qosCount']},{dataAttr : ['.Pair_State','.Pair_Errors','.Pair_UpTime','.Current_Node','.primary_Node_Role','.primary_Node_Status','.primary_Node_Errors','.primary_Process_Mode','.secondary_Node_Role','.secondary_Node_Status','.secondary_Node_Errors','.secondary_Process_Mode']},{dataAttr : '._primaryLogs'},{dataAttr : '._secondaryLogs'},{dataAttr : '._coresTable'},{dataAttr : 'topology'}]
+
+                console.log('-------------------------------',serverId);
+                /*selectedIndex.forEach(function(index){
+                    console.log('index',objData[index]['dataAttr']);
+                    if (Array.isArray(objData[index]['dataAttr'])) {
+                        objData[index]['dataAttr'].forEach(function(data){
+                            console.log($('#'+serverId).find(data).text());
+                        });
+                    } else {
+                        console.log($('#'+serverId).find(objData[index]['dataAttr']).text());
+                    }
+                });*/
                 data.push($('#'+serverId).find('.vmsCount').text());
                 data.push($('#'+serverId).find('.disksCount').text());
                 data.push($('#'+serverId).find('.snapshot').text());
-                data.push($('#'+serverId).find('.servicegroup').text());
+                data.push($('#'+serverId).find('.isFipsEncryptionEnabled').text());
                 data.push($('#'+serverId).find('.spaceTotalGiB').text());
                 data.push($('#'+serverId).find('.spaceUsedPhysicalGiB').text());
                 data.push($('#'+serverId).find('.spaceRemainingPhysicalGiB').text());
@@ -1141,17 +1719,74 @@
                 data.push($('#'+serverId).find('.logicalSpaceTotalGiB').text());
                 data.push($('#'+serverId).find('.logicalUniqueSpaceUsedGiB').text());
                 data.push($('#'+serverId).find('.spaceRemainingLogicalGiB').text());
+                //service group
+                data.push($('#'+serverId).find('.syncCount').text());
+                data.push($('#'+serverId).find('.asyncCount').text());
+                data.push($('#'+serverId).find('.cloudCount').text());
+                data.push($('#'+serverId).find('.quotaCount').text());
+                data.push($('#'+serverId).find('.qosCount').text());
+                //health status
+                data.push($('#'+serverId).find('.Pair_State').text());
+                data.push($('#'+serverId).find('.Pair_Errors').text());
+                data.push($('#'+serverId).find('.Pair_UpTime').text());
+                data.push($('#'+serverId).find('.Current_Node').text());
+
+                data.push($('#'+serverId).find('.primary_Node_Role').text());
+                data.push($('#'+serverId).find('.primary_Node_Status').text());
+                data.push($('#'+serverId).find('.primary_Node_Errors').text());
+                data.push($('#'+serverId).find('.primary_Process_Mode').text());
+
+                data.push($('#'+serverId).find('.secondary_Node_Role').text());
+                data.push($('#'+serverId).find('.secondary_Node_Status').text());
+                data.push($('#'+serverId).find('.secondary_Node_Errors').text());
+                data.push($('#'+serverId).find('.secondary_Process_Mode').text());
+
+
+                var table = $('#'+serverId+'_schedules');
+                table.find('tr').each(function (i) {
+                     var $tds = $(this).find('td'),
+                        name = $tds.eq(0).text(),
+                        type = $tds.eq(1).text(),
+                        sday = $tds.eq(2).text(),
+                        rLocal = $tds.eq(3).text(),
+                        consistency = $tds.eq(4).text();
+                    console.log('schedules: ' + name,type,sday,rLocal, consistency);
+                });
+
+                var table = $('#'+serverId+'_primaryLogs');
+                table.find('tr').each(function (i) {
+                    var $tds = $(this).find('td'),
+                    logs = $tds.eq(0).text();
+                    // console.log('PrimaryId: ' + logs);
+                });
+
+                var table = $('#'+serverId+'_secondaryLogs');
+                table.find('tr').each(function (i) {
+                    var $tds = $(this).find('td'),
+                    productId = $tds.eq(0).text();
+                    // console.log('SecondaryId: ' + productId);
+                });
+
+                var table = $('#'+serverId+'_coresTable');
+                table.find('tr').each(function (i) {
+                    var $tds = $(this).find('td'),
+                    coreData = $tds.eq(0).text();
+                    // console.log('coreData: ' + coreData);
+                });
+                console.log(topologyData);
                 excelData.push(data);
                 data = [];
             });
             setTimeout(function(){},2000); 
-            console.log('excel',excelData);
+            console.log('excel',data);
             return excelData;
-        }
+        }        
 
         function removeElement(obj) {
             $('#'+ obj.id).remove();
-            var servername = $(obj).attr('id');
+            var servername = $(obj).attr('id');        
+            delete(topologyData[servername]);
+            console.log('topologyData',topologyData);
             try{
                 clearInterval(intervals[servername]);
                 $.each(reloadData, function(key,value){
@@ -1200,6 +1835,22 @@
             });
         }
         
+        // update core files
+        function updateCoresFiles(arg) {
+            try {                
+                var servername = $(arg).attr('id');            
+                var days = $('.'+servername+'_days option:selected').val();
+                console.log('servername',servername, days);
+                db.vmstores.get(servername, function(item){
+                    console.log(item);
+                    fetchCoresCrashes(item, days);
+                });
+            }
+            catch(err) {
+                console.log(err);
+            }
+        }
+
         // DB
         var db = new Dexie('tintri_tool');
         db.version(1).stores({
@@ -1237,6 +1888,7 @@
         // db.vmstores.bulkAdd(dd);
 
         $("#serverFormDiv").hide();
+        $('#serverCustomize').hide();
 
         // List Server Details
         var serverTable = $('#example').DataTable({
@@ -1323,7 +1975,7 @@
             } else {
                 alert('Select the VMStore');
             }
-        });
+        });            
 
         $(document).on('click', '#saveServerDetails',function(e){
             var form = $("form#serverForm");

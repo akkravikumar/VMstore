@@ -733,6 +733,7 @@
                 var servername = $(obj).attr('id');
                 var fileName = $(obj).attr('data');
                 var controller = $(obj).attr('controller');
+                console.log(servername,fileName, controller)
                 $('#'+sanitizeServerName(servername) +'_logs_downloading').show();  
                 db.vmstores.get(servername, function(item){
                     downloadSCPData(item,fileName, 'log', controller);
@@ -779,7 +780,8 @@
         function downloadSCPData(item, fileName,type, controller) {
             var pathType = '', typeFolder='';
             var servername = item['servername'];
-            var fs = require('fs');                
+            var fs = require('fs');             
+            fileName = fileName.trim();
             if (type =='cores') {
                 var dir = './cores';
                 if (!fs.existsSync(dir)){
@@ -787,6 +789,9 @@
                 } 
                 typeFolder = '/cores/';
                 pathType = '/var/corefiles/'+fileName;
+
+                console.log('controller=',controller,servername,fileName,type,item, pathType);
+
             } else {
                 var dir = './log';
                 if (!fs.existsSync(dir)){
@@ -795,7 +800,7 @@
                 typeFolder = '/log/';
                 pathType = '/var/log/tintri/'+fileName;
                 servername = servername+controller;
-                console.log('controller=',controller);
+                console.log('controller=',controller,servername,fileName,type,item, pathType);
             }
             
             var client = require('scp2');

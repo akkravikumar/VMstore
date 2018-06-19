@@ -63,7 +63,7 @@
         <div class="alert" id="alertMsg" role="alert"></div>
 
         <div class="card" id="serverFormDiv">
-            <h5 class="card-header">Server Details
+            <h5 class="card-header">VMstore Details
                 <a href="javascript:hideElement()" id="hideServerCard" class="hideServerDivCard float-right" title="Hide">
                     <i class="fa fa-times" aria-hidden="true" style="color:red"></i>
                 </a>
@@ -72,8 +72,8 @@
                 <div class="card-body">
                         <div class="form-row">
                             <div class="form-group col-md-4">
-                              <label>Server Name</label>
-                              <input type="text" name="servername" class="form-control" placeholder="Server Name" required>
+                              <label>VMstore Name</label>
+                              <input type="text" name="servername" class="form-control" placeholder="VMstore Name" required>
                             </div>
                             <div class="form-group col-md-4">
                               <label>User Name</label>
@@ -92,7 +92,7 @@
         <br/>
 
         <div class="card" id="serverList">
-            <h5 class="card-header"> Server List
+            <h5 class="card-header"> VMstore List
                  <button class="selectedServerBtn btn btn-info float-right" title="Select Server"><i class="fa fa-eye" aria-hidden="true"></i></button>
 
                  <button class="serverFormDivBtn btn btn-primary float-right" title="Add Server"><i class="fa fa-plus" aria-hidden="true"></i></button>
@@ -103,7 +103,7 @@
                 <thead>
                     <tr>
                         <th></th>
-                        <th>Server Name</th>
+                        <th>VMstore Name</th>
                         <th>Username</th>
                         <th>Password</th>
                         <th>Action</th>
@@ -182,7 +182,7 @@
         </div>
         <!-- // -->
         <div class="card">
-            <h5 class="card-header"> Server Info
+            <h5 class="card-header"> VMstore Info
                  <a href="javascript:downloadPdf()" class="serverFormDivBtn btn btn-primary float-right" title="Download PDF"><i class="fa fa-file-pdf-o" aria-hidden="true"></i></a>
                   <a href="javascript:downloadExcel()" class="ExportBtn btn btn-primary float-right" title="Download Excel"><i class="fa fa-file-excel-o" aria-hidden="true"></i></a>
              </h5>             
@@ -564,18 +564,39 @@
 
                 var nodeLength = 0;
                 console.log('myobjectnode==',myObject)
+                var isPrimary = false;
                 myObject.node.forEach(function(value){
-                    value.forEach(function(argument){
+                    console.log('value',value);
+                    isPrimary = false;
+                    var tagId = null;
+                    value.forEach(function(argument, i){
                         var result = Object.values(argument)[0];
+                        console.log('argument',result);
                         if(!result){
                             result = '<i class="fa fa-lg fa-times-circle" aria-hidden="true"></i>';
                         }
-                        if (nodeLength == 0) {
-                            setServerValues(item['servername'],'primary_'+ Object.keys(argument)[0],result);
+                        
+                        if (!isPrimary) {
+                            if (Object.values(argument)[0] == 'PRIMARY') {
+                                isPrimary = true;
+                                tagId = 'primary_'
+                                $('#'+item['servername']).find('#primaryNode').html('Node#'+nodeLength);
+                                // setServerValues(item['servername'],'primaryNode','Node#'+nodeLength);
+                            } else {
+                                isPrimary = false;
+                                tagId = 'secondary_'
+                                $('#'+item['servername']).find('#secondaryNode').html('Node#'+nodeLength);
+                            }
+                        }
+                        setServerValues(item['servername'],tagId+ Object.keys(argument)[0],result);
+
+                       /* if (nodeLength == 0) {                        
+                            setServerValues(item['servername'],tagId+ Object.keys(argument)[0],result);
                         } else {
-                            setServerValues(item['servername'],'secondary_'+ Object.keys(argument)[0],result);
-                        } 
+                            setServerValues(item['servername'],tagId+ Object.keys(argument)[0],result);
+                        }*/
                     });
+
                     nodeLength = nodeLength +1;
                     /*for (var i = 0; i < value.length; i++) {
                         var argument = value[i];
@@ -637,8 +658,36 @@
                     tag:'_secondaryLogs',
                     color:'#FFFFFF'
                 }];
-            controllerList.forEach(function(controller){                
-                sftp.connect({
+            var exec = require('node-ssh-exec');            
+            controllerList.forEach(function(controller){ 
+                var config = {
+                    host: servername+controller['node'],
+                    username: username,
+                    password: password
+                },
+                command = "ls -ls /var/log/tintri | awk '{print $7,$8,$9, \"^|\" ,$10}'";             
+                exec(config, command, function (error, response) {
+                    if (error) {
+                        console.log('error',error);
+                        throw error;
+                    }                 
+                    console.log('error',response.length);
+                    var res = response.split('\n');
+                    var content = null;
+                    res.forEach(function(fileData, i) {
+                        var splitName = fileData.split('^|');
+                        var fileName = splitName[1];
+                        if (fileName != null && fileName) {
+                            content += '<tr><td align="left"><a href="" onclick="downloadLogItem(this); return false;" controller="'+controller['node']+'" data="'+fileName+'" id="'+ servername +'" style="color:'+controller['color']+';text-decoration: underline;">'+ splitName[0] +' '+fileName +'</a></td></tr>'
+                        }                      
+                    });
+                    $('#'+sanitizeServerName(item['servername']) +controller['tag']).html(content);                    
+                });
+
+
+
+
+               /* sftp.connect({
                     host: servername+controller['node'],
                     username: username,
                     password: password
@@ -646,17 +695,21 @@
                     return sftp.list('/var/log/tintri');
                 }).then((data) => {
                     var content = null;
-                    data.forEach(function(fileData) {
-                        content += '<tr><td align="left"><a href="" onclick="downloadLogItem(this); return false;" controller="'+controller['node']+'" data="'+fileData.name+'" id="'+ servername +'" style="color:'+controller['color']+';text-decoration: underline;">'+ new Date().toLocaleString(fileData.modifyTime) + ' '+ fileData.name +'</a></td></tr>'
+                    data.forEach(function(fileData, i) {
+                        var d = new Date(fileData.modifyTime);
+                        if (controller['node'] == 'A') {
+                            // console.log(servername+controller['node'],i,' ', data.length,' ',d.toLocaleString(),' ', fileData.name);
+                        }
+                        content += '<tr><td align="left"><a href="" onclick="downloadLogItem(this); return false;" controller="'+controller['node']+'" data="'+fileData.name+'" id="'+ servername +'" style="color:'+controller['color']+';text-decoration: underline;">'+ d.toLocaleString() + ' '+ fileData.name +'</a></td></tr>'
                     });
                     // if (controller =='A') {
-                    $('#'+sanitizeServerName(item['servername']) +controller['tag']).html(content);
+                    $('#'+sanitizeServerName(item['servername']) +controller['tag']).html(content);*/
                     // } else  {
                         // $('#'+sanitizeServerName(item['servername']) +'_secondaryLogs').html(content);
                     // }
-                }).catch((err) => {
-                    console.log(err, 'catch error');
-                });
+                // }).catch((err) => {
+                //     console.log(err, 'catch error');
+                // });
             });
             /*sftp.connect({
                 host: servername,
@@ -755,8 +808,9 @@
                     path: pathType
                 }, process.cwd() + typeFolder, function(err) {
                     if(err){
-                      console.log('There has been some error!!!');
-                      console.log(err);
+                        alert('Download failed, Please try again later.')
+                        console.log('There has been some error!!!');
+                        console.log(err);
                     } else {
                         alert('File has downloaded successfully in the path of '+process.cwd()+typeFolder);
                     }
@@ -792,14 +846,15 @@
                 d.setDate(d.getDate() - days);
                 var content = '';
                 var isFile = [];
+                $('#'+sanitizeServerName(item['servername'])).find('#date_range').html('From '+ d.toLocaleString()+ ' to Till Now');
                 data.forEach(function(fileData){
                     if (fileData.name.includes('sqsh.gz') || fileData.name.includes('gz')) {
                         var fileModifyDate = new Date(fileData.modifyTime);
                         var validCore = fileModifyDate.getTime() >= d.getTime();
-                        // if (validCore) {
+                        if (validCore) {
                             isFile.push(fileData.name);
                             content += '<tr><td align="left"><a href="" onclick="downloadCoresItem(this); return false;" data="'+fileData.name+'" id="'+ item['servername'] +'" style="color:#FFFFFF;text-decoration: underline;">'+ fileData.name +'</a></td></tr>';
-                        // }
+                        }
                     }
                 });
                 if (isFile.length == 0) {
@@ -1082,7 +1137,7 @@
             //refresh
             html += '<a href="" style="display:block; padding-left:10px"'
             html += 'onclick="reloadItem(this); return false;" id="'+ sanitizeServerName(servername) +'"';
-            html += 'class="reloadDivCard float-right" title="Refresh">'; 
+            html += 'class="reloadDivCard float-right" title="Auto-Refresh">'; 
             html += '<i class="fa fa-refresh" aria-hidden="true" id="'+ sanitizeServerName(servername) +'_refresh" style="color:red; "></i></a>';
             //dropdown
             html += '<select class="'+ sanitizeServerName(servername) +'_seconds float-right"><option value="10">10</option><option value="20">20</option>'
@@ -1295,7 +1350,7 @@
             html += '</div>';
             // html += '<div class="container"><h5 class="card-header">Monitor System Health</h5></div>';
             html += '<div class="card border border-secondary">';
-            html += '<h5 class="card-header text-white bg-secondary ">Primary</h5>';
+            html += '<h5 class="card-header text-white bg-secondary " id="primaryNode">Primary</h5>';
             html += '<table class="table table-bordered table-striped table-sm">';
             html += '<tbody>';
             html += '<tr>';
@@ -1326,7 +1381,7 @@
             html += '</table>';
             html += '</div>';
             html += '<div class="card border border-secondary">';
-            html += '<h5 class="card-header text-white bg-secondary ">Secondary</h5>';
+            html += '<h5 class="card-header text-white bg-secondary " id="secondaryNode">Secondary</h5>';
             html += '<table class="table table-bordered table-striped table-sm">';
             html += '<tbody>';
             html += '<tr>';
@@ -1390,7 +1445,8 @@
             html += '<select class="'+ sanitizeServerName(servername) +'_days float-right">'
             html += '<option value="2">2</option><option value="4">4</option>'
             html += '<option value="6">6</option><option value="8">8</option><option value="10">10</option></select>';
-            html += '<label class="float-right" style="display:block; padding-right:10px">Days:</label></div></br>';
+            html += '<label class="float-right" style="display:block; padding-right:10px">Days:</label>'
+            html += '<label class="float-left" id="date_range" style="display:block; padding-right:10px"></label></div></br>';
             html += '<div id="'+sanitizeServerName(servername)+'_cores_spin" style="display:block;">Please wait <i class="fa fa-circle-o-notch fa-spin" style="font-size:24px"></i></div>';
             html += '<div id="'+sanitizeServerName(servername)+'_cores"';            
             html += 'style="height: 100px; overflow: auto; display:none;">'
@@ -1418,7 +1474,7 @@
             //Log files
             html += '<div class="card-group">';                       
             html += '<div class="card border bg-warning">';
-            html += '<h5 class="card-header bg-warning ">Primary Log'
+            html += '<h5 class="card-header bg-warning ">Primary Controller Log'
 
             html += '<a style="display:none; padding-left:10px;"'
             html += 'id="'+ sanitizeServerName(servername) +'_logs_downloading"';
@@ -1427,14 +1483,14 @@
 
             html += '</h5>';
             html += '<div class="card-body" style="height: 200px; overflow: auto;">';
-            html += '<table class="table table-bordered table-striped table-sm">';
+            html += '<table>';
             html += '<tbody id="'+sanitizeServerName(servername)+'_primaryLogs">';
             html += '</tbody>';          
             html += '</table>';
             html += '</div></div>';
            
             html += '<div class="card border border-secondary  bg-primary">';
-            html += '<h5 class="card-header  text-white bg-primary">Secondary Log</h5>';
+            html += '<h5 class="card-header  text-white bg-primary">Secondary Controller Log</h5>';
             html += '<div class="card-body" style="height: 200px; overflow: auto;">';
             html += '<table>';
             html += '<tbody id="'+sanitizeServerName(servername)+'_secondaryLogs">';
@@ -1568,8 +1624,7 @@
                         objData[index]['dataAttr'].forEach(function(data){
                             if (index == 15) {
                                 if (!isHeader) {
-                                    excelHeaderData.push('Primary Log');
-                                    excelHeaderData.push('Secondary Log');
+                                    excelHeaderData.push(data);
                                 }
                                 var tableData = '';
                                 var table = $('#'+serverId+data);
